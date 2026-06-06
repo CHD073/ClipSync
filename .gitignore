@@ -1,5 +1,6 @@
 # Rust build artifacts
 target/
+debug
 
 # OS files
 Thumbs.db
@@ -17,14 +18,6 @@ Desktop.ini
 *.tar.gz
 *.log
 
-# Planning / temp files (not part of source)
-source/
-PLAN.md
-CLIPSYNC_PLAN.md
-CLIPSYNC_V2_PLAN.md
-error.txt
-output.txt
-
 # Generated config (contains device UUID)
 clipsync*.toml
 config.toml
@@ -34,3 +27,8 @@ config.toml
 
 # Test output logs
 e2e_*.txt
+
+# Rust backup / debug files
+**/*.rs.bk
+*.pdb
+**/mutants.out*/
