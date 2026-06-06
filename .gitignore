@@ -1,0 +1,36 @@
+# Rust build artifacts
+target/
+
+# OS files
+Thumbs.db
+.DS_Store
+Desktop.ini
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Build artifacts
+*.tar.gz
+*.log
+
+# Planning / temp files (not part of source)
+source/
+PLAN.md
+CLIPSYNC_PLAN.md
+CLIPSYNC_V2_PLAN.md
+error.txt
+output.txt
+
+# Generated config (contains device UUID)
+clipsync*.toml
+config.toml
+
+# Runtime data (SQLite DB)
+*.db
+
+# Test output logs
+e2e_*.txt
