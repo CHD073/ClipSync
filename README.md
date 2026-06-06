@@ -6,14 +6,14 @@
 
 ```
 ┌─────────────┐     WebSocket     ┌──────────────┐
-│  Windows     │ ◄──────────────► │  Server       │
-│  (Client)    │     REST API     │  (CentOS VM)  │
+│  Windows    │ ◄──────────────►  │    Server    │
+│  (Client)   │     REST API      │(Linux Server)│
 └─────────────┘                   └──────┬───────┘
                                          │
                                 ┌────────▼───────┐
-                                │  Android        │
-                                │  (planned)      │
-                                └─────────────────┘
+                                │    Android     │
+                                │   (planned)    │
+                                └────────────────┘
 ```
 
 - **Server** — Rust / Axum，WebSocket 实时推送 + REST API
