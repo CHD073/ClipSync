@@ -53,6 +53,14 @@ cargo build --release
 export LITECLIPSYNC_TOKEN="your_secret_token"
 ./target/release/liteclipsync-server
 
+# 服务端docker部署
+docker run -d \
+  --name liteclipsync \
+  -p 8765:8765 \
+  -e LITECLIPSYNC_TOKEN=your_token_here \
+  -v ./data:/data \
+  worldlydust/liteclipsync-server:latest
+
 # Windows 客户端
 cd liteclipsync-windows && cargo build --release
 # 双击 liteclipsync.exe，编辑 config.toml 填入 server_url + token
