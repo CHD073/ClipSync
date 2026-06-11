@@ -10,6 +10,7 @@ fn default_http_timeout() -> u64 { 180 }
 fn default_hotkey_copy() -> String { "Ctrl+Shift+C".into() }
 fn default_hotkey_paste() -> String { "Ctrl+Shift+V".into() }
 fn default_hotkey_toggle() -> String { "Ctrl+Alt+V".into() }
+fn default_language() -> String { "en".into() }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Config {
@@ -32,6 +33,8 @@ pub struct Config {
     pub hotkey_paste: String,
     #[serde(default = "default_hotkey_toggle")]
     pub hotkey_toggle: String,
+    #[serde(default = "default_language")]
+    pub language: String,
     #[serde(skip)]
     pub config_path: PathBuf,
 }
@@ -153,6 +156,7 @@ impl Config {
             hotkey_copy: "Ctrl+Shift+C".into(),
             hotkey_paste: "Ctrl+Shift+V".into(),
             hotkey_toggle: "Ctrl+Alt+V".into(),
+            language: "en".into(),
             config_path: PathBuf::new(),
         }
     }

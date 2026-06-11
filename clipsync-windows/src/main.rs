@@ -94,9 +94,9 @@ fn main() {
     let (status_tx, status_rx) = bounded::<SyncStatus>(16);
 
     // ── 第一时间创建托盘 (消除启动鼠标转圈) ──
-    let _menu = build_menu(&cfg, false, "", "", false, false, &cmd_tx);
+    let _menu = build_menu(&cfg, false, "", "", false, false, &cmd_tx, &cfg.language);
     let tray = match TrayIconBuilder::new()
-        .with_tooltip("ClipSync - connecting...")
+        .with_tooltip(if cfg.language == "zh" { "ClipSync - 连接中..." } else { "ClipSync - connecting..." })
         .with_icon(make_circle_icon(0xFF, 0xCC, 0x00))
         .with_menu(Box::new(_menu))
         .build()
@@ -183,7 +183,7 @@ fn main() {
                 &mut auto_sync, &cfg, &cmd_tx, &mut last_icon_color, &mut last_tooltip);
 
             while let Ok(event) = menu_rx.try_recv() {
-                handle_menu_event(event.id, &cfg, &cmd_tx, &mut auto_sync, &shutdown);
+                handle_menu_event(event.id, &mut cfg, &cmd_tx, &mut auto_sync, &shutdown, &mut menu_dirty);
             }
 
             std::thread::sleep(Duration::from_millis(50));
@@ -240,6 +240,12 @@ fn handle_hotkey(id: i32, cmd_tx: &crossbeam_channel::Sender<SyncCommand>) {
 
 // ── 托盘菜单 ──
 
+fn en_zh(en: &'static str, zh: &'static str) -> (&'static str, &'static str) { (en, zh) }
+
+fn t<'a>(lang: &str, (en, zh): (&'a str, &'a str)) -> &'a str {
+    if lang == "zh" { zh } else { en }
+}
+
 fn build_menu(
     _cfg: &config::Config,
     connected: bool,
@@ -248,51 +254,54 @@ fn build_menu(
     auto_sync: bool,
     autostart: bool,
     _cmd_tx: &crossbeam_channel::Sender<SyncCommand>,
+    lang: &str,
 ) -> Menu {
     let menu = Menu::new();
 
     let (status_text, gr, gg, gb) = if connected {
-        ("Connected", 0x44u8, 0xCCu8, 0x44u8)
+        (t(lang, en_zh("Connected", "已连接")), 0x44u8, 0xCCu8, 0x44u8)
     } else {
-        ("Disconnected", 0xFFu8, 0x44u8, 0x44u8)
+        (t(lang, en_zh("Disconnected", "已断开")), 0xFFu8, 0x44u8, 0x44u8)
     };
     let dot = make_menu_dot(gr, gg, gb);
     let _ = menu.append(&IconMenuItem::with_id("status-text", status_text, true, Some(dot), None));
     let info_dot = make_menu_dot(0x44, 0xAA, 0xFF);
     let _ = menu.append(&IconMenuItem::new(
-        format!("Last sync: {}", last_sync_time), true, Some(info_dot.clone()), None,
+        format!("{}: {}", t(lang, en_zh("Last Sync", "上次同步")), last_sync_time), true, Some(info_dot.clone()), None,
     ));
     let _ = menu.append(&IconMenuItem::new(
-        format!("From: {}", last_sync_from), true, Some(info_dot), None,
+        format!("{}: {}", t(lang, en_zh("From", "来自")), last_sync_from), true, Some(info_dot), None,
     ));
     let _ = menu.append(&PredefinedMenuItem::separator());
 
-    let upload_item = MenuItem::with_id("sync-upload", "Upload", true, None);
+    let upload_item = MenuItem::with_id("sync-upload", t(lang, en_zh("Upload", "上传")), true, None);
     let _ = menu.append(&upload_item);
-    let download_item = MenuItem::with_id("sync-download", "Download", true, None);
+    let download_item = MenuItem::with_id("sync-download", t(lang, en_zh("Download", "下载")), true, None);
     let _ = menu.append(&download_item);
 
-    let toggle_sync = CheckMenuItem::with_id("auto-sync", "Auto-Sync", true, auto_sync, None);
+    let toggle_sync = CheckMenuItem::with_id("auto-sync", t(lang, en_zh("Auto-Sync", "自动同步")), true, auto_sync, None);
     let _ = menu.append(&toggle_sync);
 
     let _ = menu.append(&PredefinedMenuItem::separator());
 
-    let edit_cfg = MenuItem::with_id("edit-config", "Edit Config", true, None);
-    let open_dir = MenuItem::with_id("open-dir", "Open Config Directory", true, None);
-    let settings = Submenu::with_items("Settings", true, &[&edit_cfg, &open_dir])
+    let edit_cfg = MenuItem::with_id("edit-config", t(lang, en_zh("Edit Config", "编辑配置")), true, None);
+    let open_dir = MenuItem::with_id("open-dir", t(lang, en_zh("Open Config Directory", "打开配置目录")), true, None);
+    let lang_name = if lang == "zh" { "English" } else { "中文" };
+    let lang_switch = MenuItem::with_id("lang-switch", lang_name, true, None);
+    let settings = Submenu::with_items(t(lang, en_zh("Settings", "设置")), true, &[&edit_cfg, &open_dir, &lang_switch])
         .expect("failed to create submenu");
     let _ = menu.append(&settings);
 
-    let autostart_item = CheckMenuItem::with_id("launch-startup", "Launch at Startup", true, autostart, None);
+    let autostart_item = CheckMenuItem::with_id("launch-startup", t(lang, en_zh("Launch at Startup", "开机自启")), true, autostart, None);
     let _ = menu.append(&autostart_item);
 
-    let open_log = MenuItem::with_id("open-log", "Open Log", true, None);
+    let open_log = MenuItem::with_id("open-log", t(lang, en_zh("Open Log", "打开日志")), true, None);
     let _ = menu.append(&open_log);
 
     let _ = menu.append(&PredefinedMenuItem::separator());
-    let restart_item = MenuItem::with_id("tray-restart", "Restart", true, None);
+    let restart_item = MenuItem::with_id("tray-restart", t(lang, en_zh("Restart", "重启")), true, None);
     let _ = menu.append(&restart_item);
-    let quit_item = MenuItem::with_id("quit", "Quit", true, None);
+    let quit_item = MenuItem::with_id("quit", t(lang, en_zh("Quit", "退出")), true, None);
     let _ = menu.append(&quit_item);
 
     menu
@@ -300,10 +309,11 @@ fn build_menu(
 
 fn handle_menu_event(
     id: MenuId,
-    _cfg: &config::Config,
+    cfg: &mut config::Config,
     cmd_tx: &crossbeam_channel::Sender<SyncCommand>,
     auto_sync: &mut bool,
     shutdown: &Arc<AtomicBool>,
+    menu_dirty: &mut bool,
 ) {
     match id.as_ref() {
         "sync-upload" => { let _ = cmd_tx.send(SyncCommand::SyncUpload); }
@@ -354,6 +364,11 @@ fn handle_menu_event(
             shutdown.store(true, Ordering::SeqCst);
             std::thread::sleep(Duration::from_millis(100));
             std::process::exit(0);
+        }
+        "lang-switch" => {
+            cfg.language = if cfg.language == "zh" { "en".into() } else { "zh".into() };
+            cfg.save().ok();
+            *menu_dirty = true;
         }
         _ => {}
     }
@@ -427,17 +442,17 @@ fn update_tray(
 
     if *menu_dirty {
         let new_menu = build_menu(cfg, is_connected, last_sync_time, last_sync_from,
-            *auto_sync, cfg.autostart, cmd_tx);
+            *auto_sync, cfg.autostart, cmd_tx, &cfg.language);
         tray.set_menu(Some(Box::new(new_menu)));
         *menu_dirty = false;
     }
 
     let ts = if is_syncing {
-        " syncing..."
+        if cfg.language == "zh" { " 同步中..." } else { " syncing..." }
     } else if is_connected {
-        " connected"
+        if cfg.language == "zh" { " 已连接" } else { " connected" }
     } else {
-        " disconnected"
+        if cfg.language == "zh" { " 已断开" } else { " disconnected" }
     };
     let tooltip = format!("ClipSync -{ts}");
     if *last_tooltip != Some(tooltip.clone()) {
