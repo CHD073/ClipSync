@@ -2,6 +2,8 @@
 
 > 自托管跨设备剪贴板实时同步工具。Windows ↔ Server ↔ Android，一次复制，所有设备立即可用。
 
+中文 | [English](docs/README_EN.md)
+
 ## 目录
 
 - [架构](#架构)
