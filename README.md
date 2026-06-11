@@ -58,7 +58,6 @@ docker run -d \
   --name liteclipsync \
   -p 8765:8765 \
   -e LITECLIPSYNC_TOKEN=your_token_here \
-  -v ./data:/data \
   worldlydust/liteclipsync-server:latest
 
 # Windows 客户端
