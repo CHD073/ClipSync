@@ -21,7 +21,7 @@ class SyncService : Service() {
         app.sm.start()
         startForeground(1, buildNotification())
         app.config.serviceRunning = true
-        return START_STICKY
+        return START_NOT_STICKY
     }
 
     override fun onDestroy() {

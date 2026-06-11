@@ -8,6 +8,9 @@ import kotlinx.coroutines.*
 import java.security.MessageDigest
 
 class SyncManager(private val ctx: Context) {
+    companion object {
+        private const val MAX_CLIP_BYTES = 1_000_000
+    }
     val cfg = (ctx.applicationContext as ClipSyncApp).config
     val http = HttpApi(cfg)
     private val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -20,12 +23,22 @@ class SyncManager(private val ctx: Context) {
     private var cycling = false
     @Volatile var connected = false
     private var autoSyncEnabled = cfg.autoSync
+    private var cooldownUntil = 0L
+    private var clipChanged = false
+
+    private val clipListener = ClipboardManager.OnPrimaryClipChangedListener {
+        clipChanged = true
+    }
 
     val running get() = cycling
     fun setAutoSync(enabled: Boolean) { autoSyncEnabled = enabled; cfg.autoSync = enabled }
 
-    fun start() { if (cycling) return; cycling = true; job = CoroutineScope(Dispatchers.IO).launch { run() } }
-    fun stop() { cycling = false; job?.cancel(); ws?.close(); ws = null; connected = false; cfg.connected = false }
+    fun start() {
+        if (cycling) return
+        cm.addPrimaryClipChangedListener(clipListener)
+        cycling = true; job = CoroutineScope(Dispatchers.IO).launch { run() }
+    }
+    fun stop() { cycling = false; job?.cancel(); ws?.close(); ws = null; connected = false; cfg.connected = false; cm.removePrimaryClipChangedListener(clipListener) }
 
     private suspend fun run() {
         while (cycling) {
@@ -41,15 +54,21 @@ class SyncManager(private val ctx: Context) {
                 pendingText = null
             }
             while (cycling && w.connected) {
-                pollWs(w)
-                if (autoSyncEnabled) checkClipboard(w)
-                delay(100)
+                try {
+                    pollWs(w)
+                    if (autoSyncEnabled) checkClipboard(w)
+                    delay(100)
+                } catch (e: Exception) {
+                    Log.e("ClipSync", "sync crash: ${e.message}", e)
+                }
             }
+            Log.e("ClipSync", "sync: disconnected, reconnecting...")
             connected = false; cfg.connected = false
         }
     }
 
     private suspend fun sendClip(w: WsClient, h: String, txt: String, sz: Long) {
+        cooldownUntil = System.currentTimeMillis() + 200
         lastHash = h
         if (sz <= cfg.autoSyncMaxBytes) {
             w.send(buildClipSync(ProfileDto("Text", h, text = txt, size = sz), cfg.deviceId))
@@ -125,33 +144,42 @@ class SyncManager(private val ctx: Context) {
     }
 
     private suspend fun checkClipboard(w: WsClient?) {
-        val shellText = ClipboardShell.getText()
-        if (shellText != null) {
-            val h = sha256(shellText.toByteArray())
-            if (h != lastHash) {
-                if (w != null) sendClip(w, h, shellText, shellText.length.toLong())
-                else { lastHash = h; pendingHash = h; pendingText = shellText; pendingSize = shellText.length.toLong() }
+        if (!clipChanged && System.currentTimeMillis() < cooldownUntil) return
+        clipChanged = false
+        val item = cm.primaryClip?.getItemAt(0)
+        var clipText = item?.text?.toString()
+        if (clipText != null && sha256(clipText.toByteArray()) == lastHash && ShizukuShell.available()) {
+            val fresh = ShizukuShell.getText()
+            if (fresh != null && fresh.isNotEmpty() && fresh != clipText) {
+                Log.e("ClipSync", "stale cm=[${clipText}] → shizuku=[${fresh}]")
+                clipText = fresh
             }
-            return
         }
-        val item = cm.primaryClip?.getItemAt(0) ?: return
-        val txt = item.text?.toString() ?: return
-        if (txt.isEmpty()) return
-        val h = sha256(txt.toByteArray())
+        if (clipText == null && ShizukuShell.available()) {
+            clipText = ShizukuShell.getText()
+        }
+        if (clipText == null || clipText.isEmpty()) return
+        Log.d("ClipSync", "check: got ${clipText.length} chars")
+        if (clipText.toByteArray().size > MAX_CLIP_BYTES) return
+        val h = sha256(clipText.toByteArray())
         if (h == lastHash) return
-        if (w != null) {
-            sendClip(w, h, txt, txt.length.toLong())
-        } else {
-            lastHash = h
-            pendingHash = h; pendingText = txt; pendingSize = txt.length.toLong()
-        }
+        Log.e("ClipSync", "check: SEND")
+        if (w != null) sendClip(w, h, clipText, clipText.length.toLong())
+        else { lastHash = h; pendingHash = h; pendingText = clipText; pendingSize = clipText.length.toLong() }
     }
 
     suspend fun applyRemote(p: ProfileDto) {
+        cooldownUntil = System.currentTimeMillis() + 200
         when (p.contentType) {
             "Text" -> {
                 val txt = if (p.hasData) String(http.download(p.dataName).getOrElse { return }) else p.text
-                lastHash = sha256(txt.toByteArray())
+                if (txt.length > MAX_CLIP_BYTES) {
+                    Log.w("ClipSync", "applyRemote: text too large (${txt.length} chars), skip")
+                    return
+                }
+                val h = sha256(txt.toByteArray())
+                if (h == lastHash) return  // already synced, skip to avoid overwriting local edits
+                lastHash = h
                 cm.setPrimaryClip(ClipData.newPlainText("ClipSync", txt))
             }
         }

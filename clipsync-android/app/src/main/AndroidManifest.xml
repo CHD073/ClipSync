@@ -36,9 +36,14 @@
             android:foregroundServiceType="dataSync" />
 
         <provider
-            android:name=".ShizukuApiProvider"
+            android:name="rikka.shizuku.ShizukuProvider"
             android:authorities="${applicationId}.shizuku"
             android:exported="true" />
+
+        <service
+            android:name=".ClipSyncUserService"
+            android:exported="true"
+            android:permission="moe.shizuku.manager.permission.API_V23" />
 
         <provider
             android:name="androidx.core.content.FileProvider"

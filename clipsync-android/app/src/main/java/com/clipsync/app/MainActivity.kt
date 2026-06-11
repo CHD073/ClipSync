@@ -1,6 +1,7 @@
-package com.clipsync.app
+﻿package com.clipsync.app
 
 import android.Manifest
+import android.app.ActivityManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -45,9 +46,9 @@ class MainActivity : ComponentActivity() {
         var token by remember { mutableStateOf(cfg.token) }
         var deviceName by remember { mutableStateOf(cfg.deviceName) }
         var connected by remember { mutableStateOf(false) }
-        var running by remember { mutableStateOf(cfg.serviceRunning) }
-        var autoSync by remember { mutableStateOf(cfg.autoSync) }
+        var running by remember { mutableStateOf(false) }
         var showServer by remember { mutableStateOf(false) }
+        var autoSync by remember { mutableStateOf(cfg.autoSync) }
         var shizukuOk by remember { mutableStateOf(false) }
         var shizukuRunning by remember { mutableStateOf(false) }
         val logs = remember { mutableStateListOf<String>() }
@@ -55,10 +56,17 @@ class MainActivity : ComponentActivity() {
         var progress by remember { mutableStateOf(-1f) }
         var progressLabel by remember { mutableStateOf("") }
 
+        fun serviceAlive(): Boolean {
+            val am = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+            return am.getRunningServices(Int.MAX_VALUE).any { it.service.className == SyncService::class.java.name }
+        }
+
+        fun log(msg: String) { logs.add(0, "${java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())} $msg") }
+
         LaunchedEffect(Unit) {
             while (true) {
                 connected = cfg.connected
-                running = cfg.serviceRunning
+                running = serviceAlive()
                 shizukuRunning = try { Shizuku.pingBinder() } catch (_: Exception) { false }
                 shizukuOk = shizukuRunning && (try { Shizuku.checkSelfPermission() == 0 } catch (_: Exception) { false })
                 autoSync = cfg.autoSync
@@ -104,7 +112,6 @@ class MainActivity : ComponentActivity() {
                     Text("ClipSync", style = MaterialTheme.typography.headlineMedium)
                     Spacer(Modifier.height(8.dp))
 
-                    // Shizuku status
                     Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = when {
                         shizukuOk -> Color(0xFFE8F5E9)
                         shizukuRunning -> Color(0xFFFFF3E0)
@@ -123,7 +130,6 @@ class MainActivity : ComponentActivity() {
                     }
                     Spacer(Modifier.height(8.dp))
 
-                    // Server config
                     Row { Text("Server", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge); Spacer(Modifier.width(4.dp)); TextButton(onClick = { showServer = !showServer }, contentPadding = PaddingValues(4.dp)) { Text(if (showServer) "\u25B2" else "\u25BC", style = MaterialTheme.typography.bodySmall) } }
                     if (showServer) {
                         OutlinedTextField(serverUrl, { serverUrl = it }, label = { Text("Server URL") }, singleLine = true, modifier = Modifier.fillMaxWidth())
@@ -134,13 +140,11 @@ class MainActivity : ComponentActivity() {
                     OutlinedTextField(deviceName, { deviceName = it; cfg.deviceName = it }, label = { Text("Device name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                     Spacer(Modifier.height(8.dp))
 
-                    // Connection status
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(if (connected) "\uD83D\uDFE2 Connected" else "\uD83D\uDD34 Disconnected", style = MaterialTheme.typography.labelLarge)
                     }
                     Spacer(Modifier.height(4.dp))
 
-                    // Start / Stop
                     Button(onClick = {
                         if (running) { stopService(Intent(this@MainActivity, SyncService::class.java)); running = false; logs.add(0, "stopped") }
                         else { startService(Intent(this@MainActivity, SyncService::class.java)); running = true; logs.add(0, "started") }
@@ -149,14 +153,12 @@ class MainActivity : ComponentActivity() {
                     }
                     Spacer(Modifier.height(4.dp))
 
-                    // Auto Sync toggle
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("Auto Sync", modifier = Modifier.weight(1f))
                         Switch(checked = autoSync, onCheckedChange = { sm.setAutoSync(it); autoSync = it })
                     }
                     Spacer(Modifier.height(8.dp))
 
-                    // Actions
                     Text("Actions", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge)
                     Spacer(Modifier.height(4.dp))
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -189,7 +191,6 @@ class MainActivity : ComponentActivity() {
                     Button(onClick = { uploadPicker.launch(arrayOf("*/*")) }, modifier = Modifier.fillMaxWidth()) { Text("Upload File") }
                     Spacer(Modifier.height(8.dp))
 
-                    // Last sync
                     var lt by remember { mutableStateOf("") }; var lf by remember { mutableStateOf("") }
                     LaunchedEffect(Unit) { while (true) { lt = cfg.lastSyncTime; lf = cfg.lastSyncFrom; delay(1000) } }
                     if (lt.isNotEmpty()) {
