@@ -1,4 +1,4 @@
-# ClipSync
+# LiteClipSync
 
 > Self-hosted cross-device clipboard sync. Copy once, available everywhere — Windows / Server / Android.
 
@@ -39,17 +39,17 @@ Windows ── WebSocket / HTTPS ──►  Server (Rust/Axum)  ◄── WebSoc
 
 ```bash
 # Server
-git clone https://github.com/CHD073/ClipSync.git && cd ClipSync/clipsync-server
+git clone https://github.com/CHD073/ClipSync.git && cd LiteClipSync/liteclipsync-server
 cargo build --release
-export CLIPSYNC_TOKEN="your_secret_token"
-./target/release/clipsync-server
+export LITECLIPSYNC_TOKEN="your_secret_token"
+./target/release/liteclipsync-server
 
 # Windows
-cd clipsync-windows && cargo build --release
-# Double-click clipsync.exe, edit config.toml with server_url + token
+cd liteclipsync-windows && cargo build --release
+# Double-click liteclipsync.exe, edit config.toml with server_url + token
 
 # Android
-cd clipsync-android && ./gradlew assembleDebug
+cd liteclipsync-android && ./gradlew assembleDebug
 # Install APK → set Server URL → authorize in Shizuku → Start
 ```
 
@@ -62,7 +62,7 @@ cd clipsync-android && ./gradlew assembleDebug
 | Direction | Message | Payload |
 |-----------|---------|---------|
 | Client→Server | `Auth` | `token` + `device_id` + `name` |
-| Client→Server | `ClipSync` | `ProfileDto` |
+| Client→Server | `LiteClipSync` | `ProfileDto` |
 | Server→Client | `AuthOk` / `AuthError` | `device_id` / `reason` |
 | Server→Client | `ClipBroadcast` | `ProfileDto` + source device |
 | Server→Client | `Backlog` | Offline message list |
@@ -105,48 +105,48 @@ cd clipsync-android && ./gradlew assembleDebug
 cargo build --release
 
 # Environment variables
-export CLIPSYNC_PORT=8765
-export CLIPSYNC_TOKEN="your_random_secret"
-export CLIPSYNC_STORAGE_PATH="/opt/clipsync/data"
+export LITECLIPSYNC_PORT=8765
+export LITECLIPSYNC_TOKEN="your_random_secret"
+export LITECLIPSYNC_STORAGE_PATH="/opt/liteclipsync/data"
 
 # Optional: HTTPS
-export CLIPSYNC_TLS_CERT_PATH="/path/to/fullchain.pem"
-export CLIPSYNC_TLS_KEY_PATH="/path/to/privkey.pem"
+export LITECLIPSYNC_TLS_CERT_PATH="/path/to/fullchain.pem"
+export LITECLIPSYNC_TLS_KEY_PATH="/path/to/privkey.pem"
 
-./target/release/clipsync-server
+./target/release/liteclipsync-server
 ```
 
 ### systemd
 
 ```ini
 [Unit]
-Description=ClipSync Server
+Description=LiteClipSync Server
 After=network.target
 
 [Service]
 Type=simple
-ExecStart=/opt/clipsync/clipsync-server
-Environment=CLIPSYNC_TOKEN=xxx
-Environment=CLIPSYNC_STORAGE_PATH=/var/lib/clipsync
+ExecStart=/opt/liteclipsync/liteclipsync-server
+Environment=LITECLIPSYNC_TOKEN=xxx
+Environment=LITECLIPSYNC_STORAGE_PATH=/var/lib/liteclipsync
 Restart=always
-User=clipsync
+User=liteclipsync
 
 [Install]
 WantedBy=multi-user.target
 ```
 
 ```bash
-sudo useradd -r clipsync
-sudo mkdir -p /var/lib/clipsync && sudo chown clipsync:clipsync /var/lib/clipsync
-sudo cp target/release/clipsync-server /opt/clipsync/
-sudo systemctl enable --now clipsync
+sudo useradd -r liteclipsync
+sudo mkdir -p /var/lib/liteclipsync && sudo chown liteclipsync:liteclipsync /var/lib/liteclipsync
+sudo cp target/release/liteclipsync-server /opt/liteclipsync/
+sudo systemctl enable --now liteclipsync
 ```
 
 ### Data Storage
 
-- Database: `{CLIPSYNC_STORAGE_PATH}/clipsync.db` (SQLite, WAL mode)
-- Files: `{CLIPSYNC_STORAGE_PATH}/files/`
-- History: retained for `CLIPSYNC_MAX_HISTORY_DAYS` days (default 7)
+- Database: `{LITECLIPSYNC_STORAGE_PATH}/liteclipsync.db` (SQLite, WAL mode)
+- Files: `{LITECLIPSYNC_STORAGE_PATH}/files/`
+- History: retained for `LITECLIPSYNC_MAX_HISTORY_DAYS` days (default 7)
 
 ---
 
@@ -159,7 +159,7 @@ sudo systemctl enable --now clipsync
 
 ### Usage
 
-1. Place `clipsync.exe` anywhere
+1. Place `liteclipsync.exe` anywhere
 2. Run once to auto-generate `config.toml`
 3. Edit `config.toml` — set `server_url` and `token`
 4. Double-click — tray icon appears
@@ -174,7 +174,7 @@ sudo systemctl enable --now clipsync
 
 ### Configuration
 
-`config.toml` — placed next to `clipsync.exe`:
+`config.toml` — placed next to `liteclipsync.exe`:
 
 ```toml
 server_url = "http://192.168.1.100:8765"
@@ -202,7 +202,7 @@ language = "en"   # "en" or "zh"
    ```bash
    adb shell /data/app/~~XXXX==/moe.shizuku.privileged.api-XXXX==/lib/arm64/libshizuku.so
    ```
-3. Open ClipSync → Authorize in Shizuku → Card turns green
+3. Open LiteClipSync → Authorize in Shizuku → Card turns green
 4. Set Server URL + Token → Start
 
 > **Note:** Restart Shizuku Server after device reboot.
@@ -231,12 +231,12 @@ Fresh ClipData → extract text → WS push
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `CLIPSYNC_PORT` | `8765` | Listen port |
-| `CLIPSYNC_TOKEN` | `clipsync` | ⚠️ Must change in production |
-| `CLIPSYNC_STORAGE_PATH` | `./data` | DB + file storage |
-| `CLIPSYNC_MAX_HISTORY_DAYS` | `7` | History retention |
-| `CLIPSYNC_TLS_CERT_PATH` | — | TLS cert path |
-| `CLIPSYNC_TLS_KEY_PATH` | — | TLS key path |
+| `LITECLIPSYNC_PORT` | `8765` | Listen port |
+| `LITECLIPSYNC_TOKEN` | `liteclipsync` | ⚠️ Must change in production |
+| `LITECLIPSYNC_STORAGE_PATH` | `./data` | DB + file storage |
+| `LITECLIPSYNC_MAX_HISTORY_DAYS` | `7` | History retention |
+| `LITECLIPSYNC_TLS_CERT_PATH` | — | TLS cert path |
+| `LITECLIPSYNC_TLS_KEY_PATH` | — | TLS key path |
 
 ### Windows Client (config.toml)
 
@@ -255,7 +255,7 @@ Fresh ClipData → extract text → WS push
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `server_url` | — | Server address |
-| `token` | `clipsync` | Auth token |
+| `token` | `liteclipsync` | Auth token |
 | `auto_sync` | `true` | Background polling |
 
 ---
@@ -264,13 +264,13 @@ Fresh ClipData → extract text → WS push
 
 ```bash
 # Server
-cd clipsync-server && cargo build --release
+cd liteclipsync-server && cargo build --release
 
 # Windows
-cd clipsync-windows && cargo build --release
+cd liteclipsync-windows && cargo build --release
 
 # Android
-cd clipsync-android && ./gradlew assembleDebug
+cd liteclipsync-android && ./gradlew assembleDebug
 ```
 
 ---
@@ -279,7 +279,7 @@ cd clipsync-android && ./gradlew assembleDebug
 
 | Risk | Mitigation |
 |------|------------|
-| Default token | Set `CLIPSYNC_TOKEN` to random string |
+| Default token | Set `LITECLIPSYNC_TOKEN` to random string |
 | Plain HTTP | Enable TLS via `TLS_CERT_PATH` / `TLS_KEY_PATH` |
 | No rate limiting | Use nginx / cloudflare |
 | SQLite no encryption | Restrict file permissions |
@@ -301,9 +301,9 @@ cd clipsync-android && ./gradlew assembleDebug
 ## Project Structure
 
 ```
-├── clipsync-server/     Rust server (Axum + SQLite + WS)
-├── clipsync-windows/    Rust Windows tray client
-└── clipsync-android/    Kotlin Android client (Compose + Shizuku)
+├── liteclipsync-server/     Rust server (Axum + SQLite + WS)
+├── liteclipsync-windows/    Rust Windows tray client
+└── liteclipsync-android/    Kotlin Android client (Compose + Shizuku)
 ```
 
 ---

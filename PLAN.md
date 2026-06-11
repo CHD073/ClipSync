@@ -141,10 +141,10 @@ download = "Ctrl+Shift+F2"
 
 | 配置项 | 配置文件字段 | 环境变量 |
 |--------|------------|---------|
-| 端口 | `port` | `CLIPSYNC_PORT` |
-| 鉴权令牌 | `token` | `CLIPSYNC_TOKEN` |
-| 存储路径 | `storage_path` | `CLIPSYNC_STORAGE_PATH` |
-| 历史保留天数 | `max_history_days` | `CLIPSYNC_MAX_HISTORY_DAYS` |
+| 端口 | `port` | `LITECLIPSYNC_PORT` |
+| 鉴权令牌 | `token` | `LITECLIPSYNC_TOKEN` |
+| 存储路径 | `storage_path` | `LITECLIPSYNC_STORAGE_PATH` |
+| 历史保留天数 | `max_history_days` | `LITECLIPSYNC_MAX_HISTORY_DAYS` |
 
 搜索路径：`./server/config.toml` → `./config.toml` → `/etc/clipboard-sync/config.toml`
 

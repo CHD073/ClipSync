@@ -3,13 +3,13 @@ target/
 debug
 
 # Android build artifacts
-clipsync-android/.gradle/
-clipsync-android/build/
-clipsync-android/app/build/
-clipsync-android/gradlew
-clipsync-android/gradlew.bat
-clipsync-android/gradle/wrapper/gradle-wrapper.jar
-clipsync-android/local.properties
+liteclipsync-android/.gradle/
+liteclipsync-android/build/
+liteclipsync-android/app/build/
+liteclipsync-android/gradlew
+liteclipsync-android/gradlew.bat
+liteclipsync-android/gradle/wrapper/gradle-wrapper.jar
+liteclipsync-android/local.properties
 
 # OS files
 Thumbs.db
@@ -28,7 +28,7 @@ Desktop.ini
 *.log
 
 # Generated config (contains device UUID)
-clipsync*.toml
+liteclipsync*.toml
 config.toml
 
 # Runtime data (SQLite DB)

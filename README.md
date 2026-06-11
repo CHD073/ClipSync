@@ -1,4 +1,4 @@
-# ClipSync
+# LiteClipSync
 
 > 自托管跨设备剪贴板实时同步工具。Windows ↔ Server ↔ Android，一次复制，所有设备立即可用。
 
@@ -48,17 +48,17 @@
 
 ```bash
 # 服务端
-git clone https://github.com/CHD073/ClipSync.git && cd ClipSync/clipsync-server
+git clone https://github.com/CHD073/ClipSync.git && cd LiteClipSync/liteclipsync-server
 cargo build --release
-export CLIPSYNC_TOKEN="your_secret_token"
-./target/release/clipsync-server
+export LITECLIPSYNC_TOKEN="your_secret_token"
+./target/release/liteclipsync-server
 
 # Windows 客户端
-cd clipsync-windows && cargo build --release
-# 双击 clipsync.exe，编辑 config.toml 填入 server_url + token
+cd liteclipsync-windows && cargo build --release
+# 双击 liteclipsync.exe，编辑 config.toml 填入 server_url + token
 
 # Android 客户端
-cd clipsync-android && ./gradlew assembleDebug
+cd liteclipsync-android && ./gradlew assembleDebug
 # 安装 APK → 填 Server URL → Shizuku 中授权 → Start
 ```
 
@@ -125,7 +125,7 @@ cd clipsync-android && ./gradlew assembleDebug
 | 消息 | type | 说明 |
 |------|------|------|
 | `Auth` | `"Auth"` | `{"type":"Auth","token":"...","device_id":"...","name":"..."}` |
-| `ClipSync` | `"ClipSync"` | `{"type":"ClipSync","payload":{...},"device_id":"..."}` |
+| `LiteClipSync` | `"LiteClipSync"` | `{"type":"LiteClipSync","payload":{...},"device_id":"..."}` |
 | `GetLatest` | `"GetLatest"` | `{"type":"GetLatest"}` |
 
 **服务端 → 客户端：**
@@ -144,7 +144,7 @@ cd clipsync-android && ./gradlew assembleDebug
 |------|------|------|------|
 | `GET` / `PUT` | `/profile/latest` | Basic Auth | 获取/更新最新剪贴板 |
 | `GET` / `PUT` | `/file/{name}` | Basic Auth | 二进制文件上传/下载 |
-| `GET` | `/health` | 无需 | `{"service":"clipsync-server","status":"ok","version":"0.1.0"}` |
+| `GET` | `/health` | 无需 | `{"service":"liteclipsync-server","status":"ok","version":"0.1.0"}` |
 | `GET` | `/api/time` | 无需 | 服务端时间戳 |
 
 ### ProfileDto
@@ -174,55 +174,55 @@ cd clipsync-android && ./gradlew assembleDebug
 
 ```bash
 git clone https://github.com/CHD073/ClipSync.git
-cd ClipSync/clipsync-server
+cd LiteClipSync/liteclipsync-server
 cargo build --release
 
 # 设置环境变量
-export CLIPSYNC_PORT=8765
-export CLIPSYNC_TOKEN="your_random_secret_token"
-export CLIPSYNC_STORAGE_PATH="/opt/clipsync/data"
+export LITECLIPSYNC_PORT=8765
+export LITECLIPSYNC_TOKEN="your_random_secret_token"
+export LITECLIPSYNC_STORAGE_PATH="/opt/liteclipsync/data"
 
 # 可选：HTTPS
-export CLIPSYNC_TLS_CERT_PATH="/etc/letsencrypt/live/example.com/fullchain.pem"
-export CLIPSYNC_TLS_KEY_PATH="/etc/letsencrypt/live/example.com/privkey.pem"
+export LITECLIPSYNC_TLS_CERT_PATH="/etc/letsencrypt/live/example.com/fullchain.pem"
+export LITECLIPSYNC_TLS_KEY_PATH="/etc/letsencrypt/live/example.com/privkey.pem"
 
-./target/release/clipsync-server
+./target/release/liteclipsync-server
 ```
 
 ### systemd 服务
 
 ```ini
-# /etc/systemd/system/clipsync.service
+# /etc/systemd/system/liteclipsync.service
 [Unit]
-Description=ClipSync Server
+Description=LiteClipSync Server
 After=network.target
 
 [Service]
 Type=simple
-ExecStart=/opt/clipsync/clipsync-server
-Environment=CLIPSYNC_TOKEN=your_secret_token
-Environment=CLIPSYNC_STORAGE_PATH=/var/lib/clipsync
+ExecStart=/opt/liteclipsync/liteclipsync-server
+Environment=LITECLIPSYNC_TOKEN=your_secret_token
+Environment=LITECLIPSYNC_STORAGE_PATH=/var/lib/liteclipsync
 Restart=always
 RestartSec=3
-User=clipsync
+User=liteclipsync
 
 [Install]
 WantedBy=multi-user.target
 ```
 
 ```bash
-sudo useradd -r -s /bin/false clipsync
-sudo mkdir -p /var/lib/clipsync
-sudo chown clipsync:clipsync /var/lib/clipsync
-sudo cp target/release/clipsync-server /opt/clipsync/
-sudo systemctl enable --now clipsync
+sudo useradd -r -s /bin/false liteclipsync
+sudo mkdir -p /var/lib/liteclipsync
+sudo chown liteclipsync:liteclipsync /var/lib/liteclipsync
+sudo cp target/release/liteclipsync-server /opt/liteclipsync/
+sudo systemctl enable --now liteclipsync
 ```
 
 ### 数据存储
 
-- 数据库：`{CLIPSYNC_STORAGE_PATH}/clipsync.db`（SQLite，WAL 模式）
-- 文件：`{CLIPSYNC_STORAGE_PATH}/files/`
-- 历史记录保留 `CLIPSYNC_MAX_HISTORY_DAYS` 天（默认 7 天）
+- 数据库：`{LITECLIPSYNC_STORAGE_PATH}/liteclipsync.db`（SQLite，WAL 模式）
+- 文件：`{LITECLIPSYNC_STORAGE_PATH}/files/`
+- 历史记录保留 `LITECLIPSYNC_MAX_HISTORY_DAYS` 天（默认 7 天）
 
 ### 数据表结构
 
@@ -261,25 +261,25 @@ CREATE TABLE clipboard_history (
 ### 构建
 
 ```bash
-cd clipsync-windows
+cd liteclipsync-windows
 cargo build --release
-# 输出：target/release/clipsync.exe
+# 输出：target/release/liteclipsync.exe
 ```
 
 ### 使用
 
-1. 将 `clipsync.exe` 放到任意目录
+1. 将 `liteclipsync.exe` 放到任意目录
 2. 首次运行自动生成 `config.toml`
 3. 编辑 `config.toml` 填入服务端 URL 和 Token
 4. 双击运行，托盘图标出现即表示已启动
 
 ### 配置文件
 
-`config.toml` 与 `clipsync.exe` 同目录。首次运行自动生成：
+`config.toml` 与 `liteclipsync.exe` 同目录。首次运行自动生成：
 
 ```toml
 server_url = "http://192.168.1.100:8765"
-token = "clipsync"
+token = "liteclipsync"
 device_id = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"  # 自动生成 UUID
 device_name = "MyPC"  # 默认取主机名
 auto_sync = true
@@ -331,7 +331,7 @@ Android 客户端通过 **Shizuku UserService** 实现后台剪贴板读取。Sh
 
 1. 安装 [Shizuku App](https://shizuku.rikka.app/)（moe.shizuku.privileged.api）
 2. 通过 ADB 或无线调试启动 Shizuku
-3. 打开 ClipSync App → 在 Shizuku 中授权 ClipSync
+3. 打开 LiteClipSync App → 在 Shizuku 中授权 LiteClipSync
 4. Shizuku 卡片变绿「Ready」即就绪
 
 > **注意：** 设备重启后需重新执行步骤 2 启动 Shizuku Server。
@@ -339,7 +339,7 @@ Android 客户端通过 **Shizuku UserService** 实现后台剪贴板读取。Sh
 ### 构建
 
 ```bash
-cd clipsync-android
+cd liteclipsync-android
 ./gradlew assembleDebug
 # 输出：app/build/outputs/apk/debug/app-debug.apk
 ```
@@ -348,7 +348,7 @@ cd clipsync-android
 
 ```
 ┌─────────────────────────────────┐
-│  ClipSync                       │
+│  LiteClipSync                       │
 │                                 │
 │  ┌─────────────────────────┐    │
 │  │ ✅ Shizuku Ready         │    │  ← 绿/橙/红三态
@@ -400,7 +400,7 @@ Shizuku UserService (UID 2000/shell)
 
 ### 首次使用流程
 
-1. 打开 ClipSync
+1. 打开 LiteClipSync
 2. 展开 Server 配置 → 填入 URL + Token → Save
 3. 确认 Shizuku 卡片为绿色（如不是，在 Shizuku App 中重新授权）
 4. 点击 ▶ Start 启动服务
@@ -415,13 +415,13 @@ Shizuku UserService (UID 2000/shell)
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
-| `CLIPSYNC_PORT` | `8765` | 监听端口 |
-| `CLIPSYNC_TOKEN` | `clipsync` | ⚠️ 生产环境必须修改 |
-| `CLIPSYNC_STORAGE_PATH` | `./data` | 数据库 + 上传文件目录 |
-| `CLIPSYNC_MAX_HISTORY_DAYS` | `7` | 历史记录保留天数 |
-| `CLIPSYNC_BIND_ADDR` | `0.0.0.0` | 监听地址 |
-| `CLIPSYNC_TLS_CERT_PATH` | — | TLS 证书路径（同时设置两个才启用 HTTPS） |
-| `CLIPSYNC_TLS_KEY_PATH` | — | TLS 私钥路径 |
+| `LITECLIPSYNC_PORT` | `8765` | 监听端口 |
+| `LITECLIPSYNC_TOKEN` | `liteclipsync` | ⚠️ 生产环境必须修改 |
+| `LITECLIPSYNC_STORAGE_PATH` | `./data` | 数据库 + 上传文件目录 |
+| `LITECLIPSYNC_MAX_HISTORY_DAYS` | `7` | 历史记录保留天数 |
+| `LITECLIPSYNC_BIND_ADDR` | `0.0.0.0` | 监听地址 |
+| `LITECLIPSYNC_TLS_CERT_PATH` | — | TLS 证书路径（同时设置两个才启用 HTTPS） |
+| `LITECLIPSYNC_TLS_KEY_PATH` | — | TLS 私钥路径 |
 
 ### Windows 客户端（config.toml）
 
@@ -446,7 +446,7 @@ Shizuku UserService (UID 2000/shell)
 | 参数 | 默认值 | 说明 |
 |------|--------|------|
 | `server_url` | — | 服务端地址 |
-| `token` | `clipsync` | 认证令牌 |
+| `token` | `liteclipsync` | 认证令牌 |
 | `device_name` | 厂商+型号 | 设备显示名 |
 | `device_id` | 自动生成 | UUID v4 |
 | `auto_sync` | `true` | 后台轮询开关 |
@@ -457,8 +457,8 @@ Shizuku UserService (UID 2000/shell)
 ## 项目结构
 
 ```
-ClipSync/
-├── clipsync-server/              # Rust 服务端
+LiteClipSync/
+├── liteclipsync-server/              # Rust 服务端
 │   ├── src/
 │   │   ├── main.rs               # 入口，路由注册，TLS 配置
 │   │   ├── config.rs             # 环境变量配置
@@ -476,7 +476,7 @@ ClipSync/
 │   │       └── mod.rs
 │   └── Cargo.toml
 │
-├── clipsync-windows/             # Rust Windows 客户端
+├── liteclipsync-windows/             # Rust Windows 客户端
 │   ├── src/
 │   │   ├── main.rs               # 托盘图标 + 热键 + 消息泵 + 优雅关闭
 │   │   ├── config.rs             # TOML 配置 + 注册表自启
@@ -487,23 +487,23 @@ ClipSync/
 │   │   └── command.rs            # 命令枚举 + 状态结构
 │   └── Cargo.toml
 │
-├── clipsync-android/             # Kotlin Android 客户端
+├── liteclipsync-android/             # Kotlin Android 客户端
 │   ├── app/src/main/
-│   │   ├── aidl/com/clipsync/app/
-│   │   │   └── IClipSyncService.aidl      # AIDL 接口定义
-│   │   ├── java/com/clipsync/app/
+│   │   ├── aidl/com/liteclipsync/app/
+│   │   │   └── ILiteClipSyncService.aidl      # AIDL 接口定义
+│   │   ├── java/com/liteclipsync/app/
 │   │   │   ├── MainActivity.kt            # Compose UI
 │   │   │   ├── SyncManager.kt             # 同步逻辑 + Echo 防护
 │   │   │   ├── WsClient.kt                # OkHttp WebSocket
 │   │   │   ├── HttpApi.kt                 # HTTP 流式上传/下载
 │   │   │   ├── Protocol.kt                # Gson DTO + WS 解析
 │   │   │   ├── Config.kt                  # SharedPreferences
-│   │   │   ├── ClipSyncApp.kt             # Application + Shizuku 初始化
+│   │   │   ├── LiteClipSyncApp.kt             # Application + Shizuku 初始化
 │   │   │   ├── SyncService.kt             # 前台 Service
 │   │   │   ├── ClipboardShell.kt          # Shizuku 状态封装
 │   │   │   ├── ShizukuCompat.kt           # Kotlin 反射访问 Shizuku
 │   │   │   ├── ShizukuShell.kt            # 绑定 UserService + 读剪贴板
-│   │   │   └── ClipSyncUserService.kt     # Shizuku UserService（shell UID）
+│   │   │   └── LiteClipSyncUserService.kt     # Shizuku UserService（shell UID）
 │   │   ├── java/rikka/shizuku/
 │   │   │   └── ShizukuProvider.kt         # 标准 ContentProvider（binder 投递）
 │   │   ├── java/moe/shizuku/api/
@@ -528,13 +528,13 @@ ClipSync/
 
 ```bash
 # 服务端
-cd clipsync-server && cargo build --release
+cd liteclipsync-server && cargo build --release
 
 # Windows 客户端（需要 Windows + MSVC toolchain）
-cd clipsync-windows && cargo build --release
+cd liteclipsync-windows && cargo build --release
 
 # Android 客户端（需要 Android SDK + JDK 17）
-cd clipsync-android && ./gradlew assembleDebug
+cd liteclipsync-android && ./gradlew assembleDebug
 ```
 
 ---
@@ -543,8 +543,8 @@ cd clipsync-android && ./gradlew assembleDebug
 
 | 风险 | 等级 | 建议 |
 |------|------|------|
-| 默认 Token | 🔴高 | 生产环境必须设置 `CLIPSYNC_TOKEN` 为随机长字符串 |
-| 明文传输 | 🔴高 | 配置 TLS 证书：`CLIPSYNC_TLS_CERT_PATH` + `CLIPSYNC_TLS_KEY_PATH` |
+| 默认 Token | 🔴高 | 生产环境必须设置 `LITECLIPSYNC_TOKEN` 为随机长字符串 |
+| 明文传输 | 🔴高 | 配置 TLS 证书：`LITECLIPSYNC_TLS_CERT_PATH` + `LITECLIPSYNC_TLS_KEY_PATH` |
 | 请求体无限 | 🟡中 | 服务端无请求大小限制，建议用 nginx 前置限制 |
 | 速率限制 | 🟡中 | 无内置限流，建议 nginx / cloudflare 防护 |
 | DB 无加密 | 🟡中 | SQLite 文件明文，确保存储目录仅服务运行用户可读 |
@@ -561,16 +561,16 @@ cd clipsync-android && ./gradlew assembleDebug
 ss -tlnp | grep 8765
 
 # 检查存储目录权限
-ls -la /opt/clipsync/data/
+ls -la /opt/liteclipsync/data/
 
 # 查看日志
-journalctl -u clipsync -f
+journalctl -u liteclipsync -f
 ```
 
 ### Windows 客户端无托盘图标
 
-- 确认没有其他 ClipSync 实例在运行（单实例保护）
-- 检查 `clipsync.log` 同目录下的日志文件
+- 确认没有其他 LiteClipSync 实例在运行（单实例保护）
+- 检查 `liteclipsync.log` 同目录下的日志文件
 - 部分 RDP/远程桌面下托盘图标可能不显示，功能正常
 
 ### Android 后台同步不工作
@@ -584,13 +584,13 @@ journalctl -u clipsync -f
 ### Android Shizuku 卡片显示红色/橙色
 
 - **红色「Not running」**：Shizuku Server 未启动，执行 ADB 启动命令
-- **橙色「Not authorized」**：在 Shizuku App 中找到 ClipSync，关掉授权再重新打开
+- **橙色「Not authorized」**：在 Shizuku App 中找到 LiteClipSync，关掉授权再重新打开
 
 ### PC 收不到手机内容
 
 1. 确认手机和 PC 连接同一个 Server
 2. 手机上确认 Auto Sync 开启且 WS 已连接（显示 🟢 Connected）
-3. 在手机前台打开 ClipSync，复制文字测试是否能同步（前台同步验证链路）
+3. 在手机前台打开 LiteClipSync，复制文字测试是否能同步（前台同步验证链路）
 4. 若前台可同步但后台不行：重启 Shizuku Server，重新授权
 
 ---
