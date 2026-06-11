@@ -102,7 +102,7 @@ class MainActivity : ComponentActivity() {
             val src = pendingFile ?: return@rememberLauncherForActivityResult
             scope.launch(Dispatchers.IO) {
                 src.inputStream().use { i -> contentResolver.openOutputStream(uri)?.use { o -> i.copyTo(o) } }
-                logs.add(0, "saved: $pendingName"); pendingFile = null
+                logs.add(0, T.saved(pendingName)); pendingFile = null
             }
         }
 
@@ -120,55 +120,55 @@ class MainActivity : ComponentActivity() {
                         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                             Text(if (shizukuOk) "\u2705 Shizuku" else if (shizukuRunning) "\u26A0 Shizuku" else "\u274C Shizuku")
                             Spacer(Modifier.width(8.dp))
-                            Text(when { shizukuOk -> "Ready"; shizukuRunning -> "Not authorized"; else -> "Not running" },
+                            Text(when { shizukuOk -> T.ready(); shizukuRunning -> T.notAuthorized(); else -> T.notRunning() },
                                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Spacer(Modifier.weight(1f))
                             if (shizukuRunning && !shizukuOk) {
-                                Button(onClick = { Shizuku.requestPermission(0) }, contentPadding = PaddingValues(8.dp, 4.dp)) { Text("Grant") }
+                                Button(onClick = { Shizuku.requestPermission(0) }, contentPadding = PaddingValues(8.dp, 4.dp)) { Text(T.grant()) }
                             }
                         }
                     }
                     Spacer(Modifier.height(8.dp))
 
-                    Row { Text("Server", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge); Spacer(Modifier.width(4.dp)); TextButton(onClick = { showServer = !showServer }, contentPadding = PaddingValues(4.dp)) { Text(if (showServer) "\u25B2" else "\u25BC", style = MaterialTheme.typography.bodySmall) } }
+                    Row { Text(T.server(), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge); Spacer(Modifier.width(4.dp)); TextButton(onClick = { showServer = !showServer }, contentPadding = PaddingValues(4.dp)) { Text(if (showServer) "\u25B2" else "\u25BC", style = MaterialTheme.typography.bodySmall) } }
                     if (showServer) {
-                        OutlinedTextField(serverUrl, { serverUrl = it }, label = { Text("Server URL") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                        OutlinedTextField(token, { token = it }, label = { Text("Token") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                        Button(onClick = { cfg.serverUrl = serverUrl; cfg.token = token }, modifier = Modifier.fillMaxWidth()) { Text("Save") }
+                        OutlinedTextField(serverUrl, { serverUrl = it }, label = { Text(T.serverUrl()) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                        OutlinedTextField(token, { token = it }, label = { Text(T.token()) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                        Button(onClick = { cfg.serverUrl = serverUrl; cfg.token = token }, modifier = Modifier.fillMaxWidth()) { Text(T.save()) }
                         Spacer(Modifier.height(4.dp))
                     }
-                    OutlinedTextField(deviceName, { deviceName = it; cfg.deviceName = it }, label = { Text("Device name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(deviceName, { deviceName = it; cfg.deviceName = it }, label = { Text(T.device()) }, singleLine = true, modifier = Modifier.fillMaxWidth())
                     Spacer(Modifier.height(8.dp))
 
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(if (connected) "\uD83D\uDFE2 Connected" else "\uD83D\uDD34 Disconnected", style = MaterialTheme.typography.labelLarge)
+                        Text(if (connected) "\uD83D\uDFE2 " + T.connected() else "\uD83D\uDD34 " + T.disconnected(), style = MaterialTheme.typography.labelLarge)
                     }
                     Spacer(Modifier.height(4.dp))
 
                     Button(onClick = {
-                        if (running) { stopService(Intent(this@MainActivity, SyncService::class.java)); running = false; logs.add(0, "stopped") }
-                        else { startService(Intent(this@MainActivity, SyncService::class.java)); running = true; logs.add(0, "started") }
+                        if (running) { stopService(Intent(this@MainActivity, SyncService::class.java)); running = false; logs.add(0, T.stopped()) }
+                        else { startService(Intent(this@MainActivity, SyncService::class.java)); running = true; logs.add(0, T.started()) }
                     }, modifier = Modifier.fillMaxWidth(), colors = if (running) ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error) else ButtonDefaults.buttonColors()) {
-                        Text(if (running) "\u25A0 Stop" else "\u25B6 Start")
+                        Text(if (running) "\u25A0 " + T.stop() else "\u25B6 " + T.start())
                     }
                     Spacer(Modifier.height(4.dp))
 
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Auto Sync", modifier = Modifier.weight(1f))
+                        Text(T.autoSync(), modifier = Modifier.weight(1f))
                         Switch(checked = autoSync, onCheckedChange = { sm.setAutoSync(it); autoSync = it })
                     }
                     Spacer(Modifier.height(8.dp))
 
-                    Text("Actions", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge)
+                    Text(T.actions(), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge)
                     Spacer(Modifier.height(4.dp))
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(onClick = {
                             scope.launch(Dispatchers.IO) {
                                 val cm = getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
                                 val txt = cm.primaryClip?.getItemAt(0)?.text?.toString()
-                                if (txt != null) logs.add(0, sm.uploadText(txt)) else logs.add(0, "no text in clipboard")
+                                if (txt != null) logs.add(0, sm.uploadText(txt)) else logs.add(0, T.noText())
                             }
-                        }, modifier = Modifier.weight(1f)) { Text("Upload") }
+                        }, modifier = Modifier.weight(1f)) { Text(T.upload()) }
                         Button(onClick = {
                             scope.launch(Dispatchers.IO) {
                                 logs.add(0, "fetching...")
@@ -186,17 +186,17 @@ class MainActivity : ComponentActivity() {
                                     withContext(Dispatchers.Main) { savePicker.launch(p.dataName) }
                                 } else logs.add(0, "type=${p.contentType}")
                             }
-                        }, modifier = Modifier.weight(1f)) { Text("Download") }
+                        }, modifier = Modifier.weight(1f)) { Text(T.download()) }
                     }
-                    Button(onClick = { uploadPicker.launch(arrayOf("*/*")) }, modifier = Modifier.fillMaxWidth()) { Text("Upload File") }
+                    Button(onClick = { uploadPicker.launch(arrayOf("*/*")) }, modifier = Modifier.fillMaxWidth()) { Text(T.uploadFile()) }
                     Spacer(Modifier.height(8.dp))
 
                     var lt by remember { mutableStateOf("") }; var lf by remember { mutableStateOf("") }
                     LaunchedEffect(Unit) { while (true) { lt = cfg.lastSyncTime; lf = cfg.lastSyncFrom; delay(1000) } }
                     if (lt.isNotEmpty()) {
-                        Text("Last Sync", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge)
+                        Text(T.lastSync(), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge)
                         Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(12.dp)) {
-                            Text(lt); if (lf.isNotEmpty()) Text("From: $lf", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                            Text(lt); if (lf.isNotEmpty()) Text(T.from() + " $lf", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                         } }
                     }
                 }
@@ -207,7 +207,7 @@ class MainActivity : ComponentActivity() {
                 }
 
                 HorizontalDivider()
-                Text("Log", style = MaterialTheme.typography.labelSmall)
+                Text(T.log(), style = MaterialTheme.typography.labelSmall)
                 Box(Modifier.height(120.dp).fillMaxWidth().padding(4.dp)) {
                     val scroll = rememberScrollState()
                     Text(logs.joinToString("\n"), style = MaterialTheme.typography.bodySmall, modifier = Modifier.fillMaxWidth().verticalScroll(scroll))
@@ -216,3 +216,4 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
+

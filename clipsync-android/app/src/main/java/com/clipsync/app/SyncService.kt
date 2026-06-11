@@ -41,8 +41,8 @@ class SyncService : Service() {
         val stopIntent = Intent(this, SyncService::class.java).apply { action = "STOP" }
         val stopPi = PendingIntent.getService(this, 0, stopIntent, PendingIntent.FLAG_IMMUTABLE)
         return Notification.Builder(this, CHANNEL_ID)
-            .setContentTitle("ClipSync")
-            .setContentText("Syncing clipboard...")
+            .setContentTitle(T.syncService())
+            .setContentText(T.syncing())
             .setSmallIcon(android.R.drawable.ic_menu_share)
             .setContentIntent(pi)
             .addAction(android.R.drawable.ic_media_pause, "Stop", stopPi)
@@ -54,8 +54,8 @@ class SyncService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val nm = getSystemService(NotificationManager::class.java)
             nm.createNotificationChannel(
-                NotificationChannel(CHANNEL_ID, "Sync", NotificationManager.IMPORTANCE_LOW).apply {
-                    description = "ClipSync background service"
+                NotificationChannel(CHANNEL_ID, T.syncChannel(), NotificationManager.IMPORTANCE_LOW).apply {
+                    description = T.syncChannelDesc()
                 }
             )
         }
