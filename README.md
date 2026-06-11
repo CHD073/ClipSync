@@ -63,11 +63,6 @@
 
 1. 安装 [Shizuku App](https://shizuku.rikka.app/)（moe.shizuku.privileged.api）
 2. 在 Shizuku 中授权 ClipSync
-3. 执行一次 ADB 命令启动 Shizuku Server（重启设备后需重新执行）：
-   ```
-   adb shell /data/app/~~xxxx==/moe.shizuku.privileged.api-xxxx==/lib/arm64/libshizuku.so
-   ```
-   Shizuku App 中的"启动路径"可通过 `adb shell pm path moe.shizuku.privileged.api` 查看。
 
 **首次使用流程：**
 1. 打开 ClipSync，确认 Shizuku 卡片状态
