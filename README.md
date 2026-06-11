@@ -48,7 +48,7 @@
 
 ```bash
 # 服务端
-git clone https://github.com/CHD073/ClipSync.git && cd LiteClipSync/liteclipsync-server
+git clone https://github.com/CHD073/LiteClipSync.git && cd LiteClipSync/liteclipsync-server
 cargo build --release
 export LITECLIPSYNC_TOKEN="your_secret_token"
 ./target/release/liteclipsync-server
