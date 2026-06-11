@@ -155,10 +155,10 @@ cd ClipSync/clipsync-server
 cargo build --release
 
 # 运行（可通过环境变量配置）
-export PORT=8765
-export SYNC_TOKEN="your_secret_token"
-export STORAGE_PATH="./data"
-export MAX_HISTORY_DAYS=7
+export CLIPSYNC_PORT=8765
+export CLIPSYNC_TOKEN="your_secret_token"
+export CLIPSYNC_STORAGE_PATH="./data"
+export CLIPSYNC_MAX_HISTORY_DAYS=7
 ./target/release/clipsync-server
 ```
 
@@ -173,9 +173,9 @@ After=network.target
 [Service]
 Type=simple
 ExecStart=/opt/clipsync/clipsync-server
-Environment=PORT=8765
-Environment=SYNC_TOKEN=my_token
-Environment=STORAGE_PATH=/var/lib/clipsync
+Environment=CLIPSYNC_PORT=8765
+Environment=CLIPSYNC_TOKEN=my_token
+Environment=CLIPSYNC_STORAGE_PATH=/var/lib/clipsync
 Restart=always
 
 [Install]
@@ -198,17 +198,19 @@ WantedBy=multi-user.target
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
-| `PORT` | `8765` | 监听端口 |
-| `SYNC_TOKEN` | `clipsync` | 认证令牌 |
-| `STORAGE_PATH` | `./data` | 数据（SQLite 数据库 + 上传文件）存储路径 |
-| `MAX_HISTORY_DAYS` | `7` | 历史记录保留天数 |
+| `CLIPSYNC_PORT` | `8765` | 监听端口 |
+| `CLIPSYNC_TOKEN` | `clipsync` | 认证令牌 |
+| `CLIPSYNC_STORAGE_PATH` | `./data` | 数据（SQLite 数据库 + 上传文件）存储路径 |
+| `CLIPSYNC_MAX_HISTORY_DAYS` | `7` | 历史记录保留天数 |
+| `CLIPSYNC_TLS_CERT_PATH` | — | TLS 证书路径（设置后启用 HTTPS/WSS） |
+| `CLIPSYNC_TLS_KEY_PATH` | — | TLS 私钥路径 |
 
 ### 客户端（config.toml）
 
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | `server_url` | string | — | 服务端地址，形如 `http://ip:8765` |
-| `token` | string | — | 与服务端 `SYNC_TOKEN` 对应 |
+| `token` | string | — | 与服务端 `CLIPSYNC_TOKEN` 对应 |
 | `device_id` | string | 自动生成 | 设备唯一标识（UUID v4），自动生成无需手动填写 |
 | `device_name` | string | 主机名 | 设备显示名称，会显示在其他设备的托盘菜单中 |
 | `auto_sync` | bool | `true` | 启动时是否开启自动同步 |

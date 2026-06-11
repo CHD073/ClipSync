@@ -61,6 +61,6 @@ pub async fn put(
     State(state): State<Arc<AppState>>,
     Json(profile): Json<ProfileDto>,
 ) -> Json<serde_json::Value> {
-    state.db.save_profile(&profile, "http-api");
-    Json(serde_json::json!({ "status": "ok" }))
+    let ok = state.db.save_profile(&profile, "http-api");
+    Json(serde_json::json!({ "status": if ok { "ok" } else { "error" } }))
 }

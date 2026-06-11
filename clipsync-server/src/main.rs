@@ -45,11 +45,22 @@ async fn main() -> anyhow::Result<()> {
         .layer(CorsLayer::permissive())
         .with_state(app_state);
 
-    let addr = format!("0.0.0.0:{}", config.port);
-    tracing::info!("listening on {}", addr);
+    let addr: std::net::SocketAddr = format!("0.0.0.0:{}", config.port).parse()?;
 
-    let listener = tokio::net::TcpListener::bind(&addr).await?;
-    axum::serve(listener, app).await?;
+    match (&config.tls_cert_path, &config.tls_key_path) {
+        (Some(cert), Some(key)) => {
+            tracing::info!("listening on {} (TLS)", addr);
+            let tls = axum_server::tls_rustls::RustlsConfig::from_pem_file(cert, key).await?;
+            axum_server::bind_rustls(addr, tls)
+                .serve(app.into_make_service())
+                .await?;
+        }
+        _ => {
+            tracing::info!("listening on {}", addr);
+            let listener = tokio::net::TcpListener::bind(addr).await?;
+            axum::serve(listener, app).await?;
+        }
+    }
 
     Ok(())
 }

@@ -47,16 +47,28 @@ fn main() {
         }
     }
 
-    let log_file = std::fs::File::create("clipsync.log")
-        .expect("failed to create log file");
-    tracing_subscriber::fmt()
-        .with_ansi(false)
-        .with_writer(Arc::new(log_file))
-        .with_env_filter(
-            EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| EnvFilter::new("info")),
-        )
-        .init();
+    match std::fs::File::create("clipsync.log") {
+        Ok(file) => {
+            tracing_subscriber::fmt()
+                .with_ansi(false)
+                .with_writer(Arc::new(file))
+                .with_env_filter(
+                    EnvFilter::try_from_default_env()
+                        .unwrap_or_else(|_| EnvFilter::new("info")),
+                )
+                .init();
+        }
+        Err(e) => {
+            tracing_subscriber::fmt()
+                .with_ansi(false)
+                .with_env_filter(
+                    EnvFilter::try_from_default_env()
+                        .unwrap_or_else(|_| EnvFilter::new("info")),
+                )
+                .init();
+            tracing::warn!("could not create log file: {e}, logging to stderr");
+        }
+    }
 
     let cli = Cli::parse();
     let mut cfg = config::Config::load().expect("failed to load config");
@@ -73,6 +85,7 @@ fn main() {
     );
 
     let running = Arc::new(AtomicBool::new(true));
+    let shutdown = Arc::new(AtomicBool::new(false));
     let connected = Arc::new(AtomicBool::new(false));
     let last_sync_at = Arc::new(AtomicU64::new(0));
     let uploading = Arc::new(AtomicBool::new(false));
@@ -82,12 +95,18 @@ fn main() {
 
     // ── 第一时间创建托盘 (消除启动鼠标转圈) ──
     let _menu = build_menu(&cfg, false, "", "", false, false, &cmd_tx);
-    let tray = TrayIconBuilder::new()
+    let tray = match TrayIconBuilder::new()
         .with_tooltip("ClipSync - connecting...")
         .with_icon(make_circle_icon(0xFF, 0xCC, 0x00))
         .with_menu(Box::new(_menu))
         .build()
-        .expect("failed to create tray icon");
+    {
+        Ok(t) => t,
+        Err(e) => {
+            tracing::error!("failed to create tray icon: {e}, exiting");
+            return;
+        }
+    };
 
     // ── 注册全局热键 ──
     register_hotkeys(&cfg);
@@ -112,14 +131,21 @@ fn main() {
         );
     }
     let r = running.clone();
+    let sd = shutdown.clone();
     let c = connected.clone();
     let s = last_sync_at.clone();
     let u = uploading.clone();
     let cfg_clone = cfg.clone();
     std::thread::spawn(move || {
-        let rt = tokio::runtime::Runtime::new().unwrap();
+        let rt = match tokio::runtime::Runtime::new() {
+            Ok(rt) => rt,
+            Err(e) => {
+                tracing::error!("failed to start runtime: {e}");
+                return;
+            }
+        };
         rt.block_on(async {
-            sync::run_sync(cfg_clone, c, s, u, cmd_rx, status_tx).await;
+            sync::run_sync(cfg_clone, c, s, u, cmd_rx, status_tx, sd).await;
         });
         r.store(false, Ordering::SeqCst);
     });
@@ -157,7 +183,7 @@ fn main() {
                 &mut auto_sync, &cfg, &cmd_tx, &mut last_icon_color, &mut last_tooltip);
 
             while let Ok(event) = menu_rx.try_recv() {
-                handle_menu_event(event.id, &cfg, &cmd_tx, &mut auto_sync);
+                handle_menu_event(event.id, &cfg, &cmd_tx, &mut auto_sync, &shutdown);
             }
 
             std::thread::sleep(Duration::from_millis(50));
@@ -277,6 +303,7 @@ fn handle_menu_event(
     _cfg: &config::Config,
     cmd_tx: &crossbeam_channel::Sender<SyncCommand>,
     auto_sync: &mut bool,
+    shutdown: &Arc<AtomicBool>,
 ) {
     match id.as_ref() {
         "sync-upload" => { let _ = cmd_tx.send(SyncCommand::SyncUpload); }
@@ -313,11 +340,19 @@ fn handle_menu_event(
                 .spawn();
         }
         "tray-restart" => {
-            let _ = std::process::Command::new(std::env::current_exe().unwrap())
-                .spawn();
+            match std::env::current_exe() {
+                Ok(exe) => {
+                    let _ = std::process::Command::new(exe).spawn();
+                }
+                Err(e) => {
+                    tracing::error!("failed to get exe path for restart: {e}");
+                }
+            }
             std::process::exit(0);
         }
         "quit" => {
+            shutdown.store(true, Ordering::SeqCst);
+            std::thread::sleep(Duration::from_millis(100));
             std::process::exit(0);
         }
         _ => {}

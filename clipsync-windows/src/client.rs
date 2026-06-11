@@ -70,6 +70,39 @@ pub async fn http_download_file(
     Ok(data)
 }
 
+pub async fn http_download_to_file(
+    config: &Config,
+    data_name: &str,
+    dest_path: &std::path::Path,
+) -> anyhow::Result<()> {
+    use tokio::io::AsyncWriteExt;
+    let url = format!("{}/file/{}", config.api_base(), data_name);
+    let client = http(config);
+    let resp = client
+        .get(&url)
+        .header("Authorization", &config.basic_auth_value())
+        .send()
+        .await
+        .context("file download failed")?;
+    anyhow::ensure!(resp.status().is_success(), "download {} -> {}", data_name, resp.status());
+    let total = resp.content_length().unwrap_or(0);
+    let mut stream = resp.bytes_stream();
+    let mut file = tokio::fs::File::create(dest_path).await.context("failed to create file")?;
+    let mut written: u64 = 0;
+    use futures_util::StreamExt;
+    while let Some(chunk) = stream.next().await {
+        let bytes = chunk.context("download chunk error")?;
+        file.write_all(&bytes).await?;
+        written += bytes.len() as u64;
+        if total > 0 && written % (8 * 1024 * 1024) < 8192 {
+            info!("http download: {} ({}/{} bytes)", data_name, written, total);
+        }
+    }
+    file.flush().await?;
+    info!("http download: {} done ({} bytes)", data_name, written);
+    Ok(())
+}
+
 pub async fn http_get_latest(config: &Config) -> anyhow::Result<LatestProfileResponse> {
     let url = format!("{}/profile/latest", config.api_base());
     let client = http(config);

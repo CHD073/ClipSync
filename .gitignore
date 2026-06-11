@@ -2,6 +2,15 @@
 target/
 debug
 
+# Android build artifacts
+clipsync-android/.gradle/
+clipsync-android/build/
+clipsync-android/app/build/
+clipsync-android/gradlew
+clipsync-android/gradlew.bat
+clipsync-android/gradle/wrapper/gradle-wrapper.jar
+clipsync-android/local.properties
+
 # OS files
 Thumbs.db
 .DS_Store
@@ -32,3 +41,8 @@ e2e_*.txt
 **/*.rs.bk
 *.pdb
 **/mutants.out*/
+
+# Temporary / backup files
+bak/
+*.txt
+*.py

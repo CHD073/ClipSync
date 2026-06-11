@@ -48,8 +48,7 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
     let mut rx = broadcast.subscribe();
     let my_device_id = device_id.clone();
 
-    // 发送任务：从广播接收 → 过滤/定向 → 写入 WS
-    let send = tokio::spawn(async move {
+    let mut send_handle = tokio::spawn(async move {
         while let Ok(msg) = rx.recv().await {
             if let Some(target) = &msg.target_device_id {
                 if target != &my_device_id {
@@ -67,8 +66,7 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
     });
 
     let did = device_id.clone();
-    // 接收任务：从 WS 读取 → 解析协议 → 保存 + 广播
-    let recv = tokio::spawn(async move {
+    let mut recv_handle = tokio::spawn(async move {
         while let Some(Ok(msg)) = ws_receiver.next().await {
             match msg {
                 Message::Text(text) => {
@@ -80,8 +78,8 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
     });
 
     tokio::select! {
-        _ = send => {}
-        _ = recv => {}
+        _ = &mut send_handle => { recv_handle.abort(); }
+        _ = &mut recv_handle => { send_handle.abort(); }
     }
 
     tracing::info!("device disconnected: {}", device_id);
@@ -146,7 +144,10 @@ async fn handle_client_message(
     match msg {
         WsClientMsg::ClipSync { payload, device_id } => {
             // 保存到离线队列
-            state.db.save_profile(&payload, &device_id);
+            if !state.db.save_profile(&payload, &device_id) {
+                tracing::error!("WS save_profile failed, dropping payload");
+                return;
+            }
 
             // 查设备名
             let source_name = state.db.get_device_name(&device_id).unwrap_or_default();

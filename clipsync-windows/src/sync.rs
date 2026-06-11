@@ -4,7 +4,6 @@ use std::time::Duration;
 
 use crossbeam_channel::{Receiver, Sender};
 use futures_util::SinkExt;
-use tokio::time::sleep;
 use tracing::{info, warn};
 
 use crate::clipboard::{set_clipboard, simulate_copy, simulate_paste, ClipboardContent, ClipboardMonitor};
@@ -20,8 +19,13 @@ pub(crate) async fn run_sync(
     uploading: Arc<AtomicBool>,
     cmd_rx: Receiver<SyncCommand>,
     status_tx: Sender<SyncStatus>,
+    shutdown: Arc<AtomicBool>,
 ) {
     loop {
+        if shutdown.load(Ordering::SeqCst) {
+            info!("shutdown signal received, exiting sync loop");
+            break;
+        }
         info!("connecting to server...");
         connected.store(false, Ordering::SeqCst);
         status_tx.send(SyncStatus {
@@ -31,11 +35,15 @@ pub(crate) async fn run_sync(
             last_sync_from: String::new(),
         }).ok();
         match connect_and_sync(&config, &connected, &last_sync_at, &uploading, &cmd_rx, &status_tx).await {
-            Ok(()) => info!("connection ended, reconnecting in 3s"),
-            Err(e) => warn!("sync error: {e:?}, reconnecting in 3s"),
+            Ok(()) => info!("connection ended"),
+            Err(e) => warn!("sync error: {e:?}"),
         }
         connected.store(false, Ordering::SeqCst);
-        sleep(Duration::from_secs(3)).await;
+        if shutdown.load(Ordering::SeqCst) {
+            info!("shutdown signal received, exiting");
+            break;
+        }
+        tokio::time::sleep(Duration::from_secs(3)).await;
     }
 }
 
@@ -321,8 +329,9 @@ async fn apply_remote_clipboard(
         "Image" => {
             let data_name = &payload.data_name;
             info!("downloading image: {}", data_name);
-            match client::http_download_file(config, &payload.data_name).await {
-                Ok(data) => {
+            match client::http_download_to_file(config, &payload.data_name, &std::env::temp_dir().join(format!("clipsync_dl_{}", payload.data_name))).await {
+                Ok(()) => {
+                    let data = std::fs::read(std::env::temp_dir().join(format!("clipsync_dl_{}", payload.data_name))).unwrap_or_default();
                     info!("image downloaded: {} ({} bytes)", data_name, data.len());
                     if let Some((rgba, w, h)) = decode_png_quick(&data) {
                         let img = arboard::ImageData { width: w, height: h, bytes: rgba.into() };
@@ -355,8 +364,10 @@ async fn apply_remote_clipboard(
         }
         "File" => {
             info!("downloading file: {}", payload.data_name);
-            match client::http_download_file(config, &payload.data_name).await {
-                Ok(data) => {
+            let dest = std::env::temp_dir().join(format!("clipsync_dl_{}", payload.data_name));
+            match client::http_download_to_file(config, &payload.data_name, &dest).await {
+                Ok(()) => {
+                    let data = std::fs::read(&dest).unwrap_or_default();
                     // data_name format: hash_originalname.ext
                     let name = payload.data_name.find('_')
                         .map(|i| &payload.data_name[i+1..])

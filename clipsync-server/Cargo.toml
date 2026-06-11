@@ -17,3 +17,4 @@ base64 = "0.22"
 anyhow = "1"
 thiserror = "2"
 futures-util = "0.3"
+axum-server = { version = "0.7", features = ["tls-rustls"] }
