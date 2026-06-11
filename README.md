@@ -328,14 +328,7 @@ Android 客户端通过 **Shizuku UserService** 实现后台剪贴板读取。Sh
 **安装与配置：**
 
 1. 安装 [Shizuku App](https://shizuku.rikka.app/)（moe.shizuku.privileged.api）
-2. 通过 ADB 或无线调试启动 Shizuku Server：
-   ```bash
-   # ADB 方式
-   adb shell sh /storage/emulated/0/Android/data/moe.shizuku.privileged.api/start.sh
-   
-   # 或直接调用 native 库（Android 13+）
-   adb shell /data/app/~~XXXX==/moe.shizuku.privileged.api-XXXX==/lib/arm64/libshizuku.so
-   ```
+2. 通过 ADB 或无线调试启动 Shizuku
 3. 打开 ClipSync App → 在 Shizuku 中授权 ClipSync
 4. Shizuku 卡片变绿「Ready」即就绪
 
