@@ -73,7 +73,7 @@ class SyncManager(private val ctx: Context) {
         if (sz <= cfg.autoSyncMaxBytes) {
             w.send(buildClipSync(ProfileDto("Text", h, text = txt, size = sz), cfg.deviceId))
         } else {
-            val name = "$h.txt"
+            val name = "${safePrefix(txt)}_${h.take(8)}.txt"
             http.upload(name, txt.toByteArray())
             w.send(buildClipSync(ProfileDto("Text", h, hasData = true, dataName = name, size = sz), cfg.deviceId))
         }
@@ -87,7 +87,7 @@ class SyncManager(private val ctx: Context) {
             wl.send(buildClipSync(ProfileDto("Text", h, text = text, size = text.length.toLong()), cfg.deviceId))
             return "sent (${text.length} chars)"
         } else {
-            val name = "$h.txt"
+            val name = "${safePrefix(text)}_${h.take(8)}.txt"
             val r = http.upload(name, text.toByteArray())
             if (r.isFailure) return "upload failed: ${r.exceptionOrNull()?.message}"
             wl.send(buildClipSync(ProfileDto("Text", h, hasData = true, dataName = name, size = text.length.toLong()), cfg.deviceId))
@@ -183,6 +183,12 @@ class SyncManager(private val ctx: Context) {
                 cm.setPrimaryClip(ClipData.newPlainText("ClipSync", txt))
             }
         }
+    }
+
+    private fun safePrefix(text: String): String {
+        val cleaned = text.replace('\n', ' ').replace('\r', ' ').replace('/', '_').replace('\\', '_')
+        val trimmed = cleaned.take(30).trim()
+        return trimmed.ifEmpty { "clip" }
     }
 
     private fun sha256(data: ByteArray): String = MessageDigest.getInstance("SHA-256")

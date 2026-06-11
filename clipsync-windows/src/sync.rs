@@ -267,7 +267,7 @@ async fn handle_local_clipboard(
             if content.size() as usize <= config.ws_inline_max_bytes {
                 profile.text = text.clone();
             } else {
-                let data_name = format!("{}.txt", hash);
+                let data_name = format!("{}_{}.txt", safe_prefix(&text, 30), &hash[..8]);
                 if let Err(e) = client::http_upload_file(config, &data_name, text.as_bytes()).await {
                     warn!("failed to upload text file: {e}");
                     return;
@@ -277,7 +277,7 @@ async fn handle_local_clipboard(
             }
         }
         ClipboardContent::Image { png_bytes, .. } => {
-            let data_name = format!("{}.png", hash);
+            let data_name = format!("{}.png", &hash[..8]);
             info!("uploading image: {} ({} bytes)", data_name, png_bytes.len());
             if let Err(e) = client::http_upload_file(config, &data_name, png_bytes).await {
                 warn!("failed to upload image: {e}");
@@ -289,7 +289,7 @@ async fn handle_local_clipboard(
             profile.size = png_bytes.len() as i64;
         }
         ClipboardContent::File { name, bytes } => {
-            let data_name = format!("{}_{}", hash, name);
+            let data_name = format!("{}_{}", &hash[..8], name);
             info!("uploading file: {} ({} bytes)", data_name, bytes.len());
             if let Err(e) = client::http_upload_file(config, &data_name, bytes).await {
                 warn!("failed to upload file: {e}");
@@ -394,6 +394,15 @@ fn decode_png_quick(data: &[u8]) -> Option<(Vec<u8>, usize, usize)> {
     let rgba = img.to_rgba8();
     let (w, h) = rgba.dimensions();
     Some((rgba.into_raw(), w as usize, h as usize))
+}
+
+fn safe_prefix(text: &str, max_len: usize) -> String {
+    let cleaned: String = text.chars()
+        .filter(|c| c.is_alphanumeric() || c.is_whitespace() || c.is_ascii_punctuation())
+        .take(max_len * 2)
+        .collect();
+    let trimmed = cleaned.trim();
+    trimmed.chars().take(max_len).collect::<String>().trim().to_string()
 }
 
 
