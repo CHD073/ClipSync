@@ -1,90 +1,81 @@
 # ClipSync
 
-> 自托管、轻量级跨设备剪贴板同步工具。一次复制，所有设备立即可用。
-
-## 关于
-
-在日常开发和使用中，经常需要在电脑、手机之间传递文本、图片或文件——发微信、发邮件、开共享文件夹都太慢了。ClipSync 通过自建服务端实现剪贴板实时同步，不依赖任何第三方云服务，数据完全自主可控。
-
-当你在一台设备上复制内容后，ClipSync 会立刻推送到所有已连接的设备，无需任何额外操作。支持 **文本**、**图片**和**文件**三类内容的同步，自动模式下完全无感，也可通过热键手动控制上传/下载。
-
-**核心特点：**
-
-- **自托管**——服务端部署在你自己的 Linux 服务器上，数据不外泄
-- **实时同步**——基于 WebSocket 长连接，复制即推送，延迟毫秒级
-- **轻量无感**——Windows 客户端仅托盘图标运行，无窗口、无控制台，不打扰工作
-- **离线不丢**——设备离线期间的内容会在上线时自动推送，不会遗漏
-- **跨平台**——当前支持 Windows 客户端 + Linux 服务端，Android 客户端规划中
-
----
+> 自托管跨设备剪贴板同步工具。Windows ↔ Server ↔ Android，一次复制，所有设备立即可用。
 
 ## 架构
 
 ```
-┌──────────────┐                         ┌──────────────┐
-│   Windows     │◄─── WebSocket ◄──────►│   Server      │
-│   (客户端)    │◄─── REST API ◄──────►│   (Linux)     │
-└──────────────┘                         └──────┬───────┘
-                                                │
-                                       ┌────────▼───────┐
-                                       │   Android       │
-                                       │   (规划中)       │
-                                       └─────────────────┘
+┌──────────────┐     WebSocket     ┌──────────────┐     WebSocket     ┌──────────────┐
+│  Windows     │◄─────────────────►│   Server      │◄─────────────────►│  Android      │
+│  (Rust 托盘)  │    HTTPS REST    │   (Rust/Axum) │   Shizuku 读写    │  (Kotlin)     │
+└──────────────┘                   └──────┬───────┘                   └──────────────┘
+                                          │
+                                 ┌────────▼────────┐
+                                 │  SQLite + files  │
+                                 │  (离线 Backlog)   │
+                                 └─────────────────┘
 ```
 
-| 组件 | 技术栈 | 说明 |
-|------|--------|------|
-| **Server** | Rust + Axum + SQLite | 剪贴板中转服务，WebSocket 实时推送 + REST API |
-| **Windows Client** | Rust + tray-icon + windows-sys | 托盘图标运行，全局热键，无窗口 |
-| **Android Client** | Kotlin（规划中） | 前台自动同步，后台手动同步 |
+| 组件 | 语言 | 核心依赖 | 运行方式 |
+|------|------|----------|----------|
+| **Server** | Rust | Axum, tokio-tungstenite, rusqlite | 长期运行（systemd / 裸机） |
+| **Windows Client** | Rust | tray-icon, arboard, reqwest | 托盘图标，无窗口 |
+| **Android Client** | Kotlin | OkHttp, Jetpack Compose, Shizuku API | 前台 Service |
 
 ---
 
 ## 功能
 
-### 内容同步
+### 同步内容
 
-| 类型 | 传输方式 | 说明 |
+| 类型 | 传输方式 | 上限 |
 |------|----------|------|
-| 文本 | WebSocket 内联 | 小于 `ws_inline_max_bytes`（默认 1MB）的文本直接经 WS 推送 |
-| 图片 | HTTP 上传 + WS 通知 | 转为 PNG 后上传至 `/file/{name}`，WS 广播元数据 |
-| 文件 | HTTP 上传 + WS 通知 | 读取磁盘内容，上传至服务端 |
-| 超大内容 | 手动同步 | 超过 `auto_sync_max_bytes`（默认 10MB）需手动触发上传/下载 |
+| 文本 | WebSocket 内联 | `ws_inline_max_bytes`（默认 1MB） |
+| 文件 | HTTP 上传 + WS 通知 | `auto_sync_max_bytes`（默认 10MB），超限需手动 |
 
 ### 同步模式
 
 | 模式 | 触发方式 | 说明 |
 |------|----------|------|
-|  **自动同步**  | 检测到剪贴板变化 | 全局开关，可在托盘菜单一键切换。自动模式下推送到所有在线设备并接收远端内容 |
-|  **手动上传**  | 托盘菜单 / 热键 | 立即上传当前剪贴板内容 |
-|  **手动下载**  | 托盘菜单 / 热键 | 从服务端拉取最新内容并写入剪贴板 |
+| **Auto Sync** | 剪贴板变化自动推送 | 可独立开关 |
+| **Upload** | 手动点击 / 热键 | 上传当前剪贴板内容 |
+| **Download** | 手动点击 / 热键 | 从服务端拉取最新内容 |
 
-### 全局热键
+### Windows 客户端
 
-| 热键 | 功能 |
-|------|------|
-| `Ctrl + Shift + C` | 复制当前内容并立即同步到所有设备 |
-| `Ctrl + Shift + V` | 从服务端拉取最新内容并粘贴 |
-| `Ctrl + Alt + V` | 切换自动同步开关 |
+- 托盘图标（绿色=已连接，红色=断开，蓝色闪烁=正在同步）
+- 全局热键：`Ctrl+Shift+C`（复制并同步）、`Ctrl+Shift+V`（同步并粘贴）、`Ctrl+Alt+V`（切换自动同步）
+- 托盘菜单：Upload / Download / Auto-Sync 开关 / Settings / Open Log / Restart / Quit
+- 开机自启（写入注册表 HKCU\Run）
+- 单实例保护（互斥锁）
+- 支持文件粘贴（CF_HDROP）
 
-热键组合可在 `config.toml` 中自定义。
+### Android 客户端
 
-### 托盘菜单
+**后台剪贴板读取实现方案：** 通过 Shizuku 框架调用系统级 shell 命令读取剪贴板，绕过 Android 10+ 的后台限制。
 
-连接状态下托盘菜单实时展示：
+| 方案 | 状态 | 说明 |
+|------|------|------|
+| Shizuku | ✅ 可用 | 后台读写剪贴板，覆盖所有 App |
+| AccessibilityService | ❌ 已移除 | 被 Shizuku 取代 |
 
-- **连接状态**（彩色圆点：绿/蓝/红）+ 最近同步时间 + 来源设备名
-- **Upload** / **Download** ——手动同步
-- **Auto-Sync** ——勾选开关自动同步
-- **Settings** ——子菜单：编辑配置文件 / 打开配置目录
-- **Launch at Startup** ——开机自启开关
-- **Restart** ——重启客户端
-- **Open Log** ——打开日志文件
-- **Quit** ——退出
+#### 使用前提
 
-### 单实例保护
+1. 安装 [Shizuku App](https://shizuku.rikka.app/)（moe.shizuku.privileged.api）
+2. 在 Shizuku 中授权 ClipSync
+3. 执行一次 ADB 命令启动 Shizuku Server（重启设备后需重新执行）：
+   ```
+   adb shell /data/app/~~xxxx==/moe.shizuku.privileged.api-xxxx==/lib/arm64/libshizuku.so
+   ```
+   Shizuku App 中的"启动路径"可通过 `adb shell pm path moe.shizuku.privileged.api` 查看。
 
-同时只能运行一个 ClipSync 客户端实例。重复启动会自动激活已有实例。
+**首次使用流程：**
+1. 打开 ClipSync，确认 Shizuku 卡片状态
+2. 如显示红色「Not running」，在 Shizuku 中重新授权（关掉再打开）
+3. 执行上方 ADB 命令
+4. 回到 ClipSync，Shizuku 卡片应变为绿色「Ready」
+5. 设置 Server URL + Token，点 **Start**
+6. **Auto Sync** 开关控制后台轮询
 
 ---
 
@@ -92,48 +83,43 @@
 
 ### WebSocket 消息
 
-客户端与服务端通过 WebSocket 通信，消息格式为 JSON，通过 `type` 字段区分：
-
 **客户端 → 服务端：**
 
-| 消息类型 | 用途 |
-|----------|------|
-| `Auth` | 携带 token、device_id、设备名进行身份认证 |
-| `ClipSync` | 通知服务端有新内容，附 `ProfileDto` 载荷 |
-| `GetLatest` | 请求服务端返回最新的剪贴板内容 |
+| 消息 | 用途 |
+|------|------|
+| `Auth` | 认证（token + device_id + 设备名） |
+| `ClipSync` | 推送新内容，附 `ProfileDto` |
+| `GetLatest` | 请求最新内容 |
 
 **服务端 → 客户端：**
 
-| 消息类型 | 用途 |
-|----------|------|
+| 消息 | 用途 |
+|------|------|
 | `AuthOk` / `AuthError` | 认证结果 |
-| `ClipBroadcast` | 广播新内容到所有在线客户端 |
-| `Backlog` | 下发离线期间遗漏的内容列表 |
-| `LatestProfile` | 返回最新的剪贴板条目（含来源设备 ID 和时间） |
-
-**心跳：** 客户端每 30 秒发送 WebSocket Ping 帧，防止空闲连接被中断。
+| `ClipBroadcast` | 广播内容到所有在线设备 |
+| `Backlog` | 离线遗漏内容 |
+| `LatestProfile` | 最新条目（含来源设备） |
 
 ### REST API
 
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| `GET` / `PUT` | `/SyncClipboard.json` | 获取/更新最新剪贴板内容（需要认证） |
-| `GET` / `PUT` | `/file/{filename}` | 上传/下载二进制文件（需要认证） |
-| `GET` | `/profile/latest` | 获取最新 Profile（含来源设备 ID） |
-| `GET` | `/health` | 健康检查（无需认证） |
-| `GET` | `/api/time` | 获取服务端时间戳 |
+| 方法 | 路径 | 认证 | 说明 |
+|------|------|------|------|
+| `GET` / `PUT` | `/profile/latest` | Basic Auth | 获取/更新最新剪贴板 |
+| `GET` / `PUT` | `/file/{name}` | Basic Auth | 二进制文件上传下载 |
+| `GET` | `/health` | 无需 | 健康检查 |
+| `GET` | `/api/time` | 无需 | 服务端时间戳 |
 
-**认证方式：** HTTP Basic Auth。用户名为空，密码为 `token`。服务端对 `/SyncClipboard.json` 和 `/file/*` 接口进行认证保护。
+**认证方式：** HTTP Basic Auth，用户名为空，密码为 `token`。
 
-### ProfileDto 结构
+### ProfileDto
 
 ```json
 {
-    "type": "Text | Image | File",
-    "hash": "SHA-256 hex string",
-    "text": "文本内容（仅 Text 类型）",
+    "type": "Text | File",
+    "hash": "SHA-256 hex",
+    "text": "文本内容",
     "has_data": true,
-    "data_name": "文件名（Image/File 类型）",
+    "data_name": "文件名",
     "size": 12345
 }
 ```
@@ -142,30 +128,28 @@
 
 ## 快速开始
 
-### 服务端部署
-
-**环境要求：** Linux（任何发行版）、Rust 工具链
+### 服务端
 
 ```bash
-# 克隆仓库
 git clone https://github.com/CHD073/ClipSync.git
 cd ClipSync/clipsync-server
-
-# 构建
 cargo build --release
 
-# 运行（可通过环境变量配置）
+# 配置
 export CLIPSYNC_PORT=8765
 export CLIPSYNC_TOKEN="your_secret_token"
-export CLIPSYNC_STORAGE_PATH="./data"
-export CLIPSYNC_MAX_HISTORY_DAYS=7
+export CLIPSYNC_STORAGE_PATH="/opt/clipsync/data"
+
+# 可选：TLS
+export CLIPSYNC_TLS_CERT_PATH="/etc/letsencrypt/live/.../fullchain.pem"
+export CLIPSYNC_TLS_KEY_PATH="/etc/letsencrypt/live/.../privkey.pem"
+
 ./target/release/clipsync-server
 ```
 
-使用 systemd 长期运行：
+#### systemd 服务
 
 ```ini
-# /etc/systemd/system/clipsync.service
 [Unit]
 Description=ClipSync Server
 After=network.target
@@ -173,10 +157,11 @@ After=network.target
 [Service]
 Type=simple
 ExecStart=/opt/clipsync/clipsync-server
-Environment=CLIPSYNC_PORT=8765
 Environment=CLIPSYNC_TOKEN=my_token
 Environment=CLIPSYNC_STORAGE_PATH=/var/lib/clipsync
 Restart=always
+RestartSec=3
+User=clipsync
 
 [Install]
 WantedBy=multi-user.target
@@ -184,43 +169,64 @@ WantedBy=multi-user.target
 
 ### Windows 客户端
 
-1. 构建或下载 `clipsync.exe`
-2. 同目录放置 `config.toml`，或首次运行自动生成默认配置
-3. 双击运行，托盘图标出现即表示已连接
+```bash
+cd clipsync-windows
+cargo build --release
+```
 
-首次运行会自动生成 `device_id`（UUID v4）并写入配置。
+运行 `clipsync-windows/target/release/clipsync.exe`，托盘图标出现即运行中。同目录下会自动生成/读取 `config.toml`。
+
+### Android 客户端
+
+```bash
+cd clipsync-android
+./gradlew assembleDebug
+# APK 位置: app/build/outputs/apk/debug/app-debug.apk
+```
+
+安装 APK 后按上方「首次使用流程」配置。
 
 ---
 
-## 配置参考
+## 配置
 
 ### 服务端（环境变量）
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
 | `CLIPSYNC_PORT` | `8765` | 监听端口 |
-| `CLIPSYNC_TOKEN` | `clipsync` | 认证令牌 |
-| `CLIPSYNC_STORAGE_PATH` | `./data` | 数据（SQLite 数据库 + 上传文件）存储路径 |
-| `CLIPSYNC_MAX_HISTORY_DAYS` | `7` | 历史记录保留天数 |
-| `CLIPSYNC_TLS_CERT_PATH` | — | TLS 证书路径（设置后启用 HTTPS/WSS） |
+| `CLIPSYNC_TOKEN` | `clipsync` | ⚠️ 生产环境必须修改 |
+| `CLIPSYNC_STORAGE_PATH` | `./data` | 数据库 + 文件存储路径 |
+| `CLIPSYNC_MAX_HISTORY_DAYS` | `7` | 历史保留天数 |
+| `CLIPSYNC_TLS_CERT_PATH` | — | TLS 证书路径 |
 | `CLIPSYNC_TLS_KEY_PATH` | — | TLS 私钥路径 |
+| `CLIPSYNC_BIND_ADDR` | `0.0.0.0` | 监听地址 |
 
-### 客户端（config.toml）
+### Windows 客户端（config.toml）
 
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `server_url` | string | — | 服务端地址，形如 `http://ip:8765` |
-| `token` | string | — | 与服务端 `CLIPSYNC_TOKEN` 对应 |
-| `device_id` | string | 自动生成 | 设备唯一标识（UUID v4），自动生成无需手动填写 |
-| `device_name` | string | 主机名 | 设备显示名称，会显示在其他设备的托盘菜单中 |
-| `auto_sync` | bool | `true` | 启动时是否开启自动同步 |
-| `auto_sync_max_bytes` | usize | `10485760` | 自动同步大小上限（字节），超限需手动上传/下载 |
-| `ws_inline_max_bytes` | usize | `1048576` | WebSocket 内联传输上限（字节），文本超限会走 HTTP 通道 |
-| `http_timeout_secs` | u64 | `180` | HTTP 请求超时时间（秒） |
-| `autostart` | bool | `false` | 是否开机自启（写入注册表 `HKCU\Run`） |
-| `hotkey_copy` | string | `Ctrl+Shift+C` | 复制并同步热键 |
-| `hotkey_paste` | string | `Ctrl+Shift+V` | 同步并粘贴热键 |
-| `hotkey_toggle` | string | `Ctrl+Alt+V` | 开关自动同步热键 |
+| `server_url` | string | — | 服务端 URL |
+| `token` | string | — | 认证令牌 |
+| `device_id` | string | 自动生成 | UUID v4 |
+| `device_name` | string | 主机名 | 显示名称 |
+| `auto_sync` | bool | `true` | 自动同步 |
+| `auto_sync_max_bytes` | int | `10485760` | 自动同步大小上限 |
+| `ws_inline_max_bytes` | int | `1048576` | WS 内联上限 |
+| `http_timeout_secs` | int | `180` | HTTP 超时 |
+| `autostart` | bool | `false` | 开机自启 |
+| `hotkey_copy` | string | `Ctrl+Shift+C` | 复制并同步 |
+| `hotkey_paste` | string | `Ctrl+Shift+V` | 同步并粘贴 |
+| `hotkey_toggle` | string | `Ctrl+Alt+V` | 切换自动同步 |
+
+### Android 客户端（内置 SharedPreferences）
+
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| Server URL | — | 服务端地址 |
+| Token | `clipsync` | 认证令牌 |
+| Device Name | 厂商+型号 | 设备显示名称 |
+| Auto Sync | `true` | 后台轮询开关 |
 
 ---
 
@@ -228,34 +234,57 @@ WantedBy=multi-user.target
 
 ```
 ClipSync/
-├── clipsync-server/          # 服务端
+├── clipsync-server/          # Rust 服务端
 │   ├── src/
-│   │   ├── main.rs           # 入口，路由注册，中间件
-│   │   ├── config.rs         # 配置（环境变量）
-│   │   ├── auth.rs           # HTTP Basic Auth
-│   │   ├── db.rs             # SQLite 数据访问层
-│   │   ├── protocol.rs       # WebSocket 消息协议定义
+│   │   ├── main.rs           # 入口 + TLS + 中间件
+│   │   ├── config.rs         # 环境变量配置
+│   │   ├── auth.rs           # Basic Auth
+│   │   ├── db.rs             # SQLite（WAL 模式）
+│   │   ├── protocol.rs       # 消息协议
 │   │   ├── routes/
-│   │   │   ├── health.rs     # /health 健康检查
-│   │   │   ├── sync_profile.rs  # /SyncClipboard.json CRUD
-│   │   │   ├── file.rs       # /file/* 文件上传下载
-│   │   │   └── mod.rs        # 路由汇总
+│   │   │   ├── health.rs     # 健康检查
+│   │   │   ├── sync_profile.rs
+│   │   │   ├── file.rs       # 文件（路径穿越防护）
+│   │   │   └── mod.rs
 │   │   └── ws/
-│   │       ├── handler.rs    # WebSocket 连接处理
-│   │       ├── session.rs    # 会话管理与广播
+│   │       ├── handler.rs    # WS 连接（孤儿任务防护）
+│   │       ├── session.rs    # 广播频道
 │   │       └── mod.rs
 │   └── Cargo.toml
 │
-├── clipsync-windows/         # Windows 客户端
+├── clipsync-windows/         # Rust Windows 客户端
 │   ├── src/
-│   │   ├── main.rs           # 入口，托盘图标，消息循环，热键注册
-│   │   ├── config.rs         # 配置读写（TOML），自启注册表
-│   │   ├── client.rs         # HTTP/WS 客户端
-│   │   ├── clipboard.rs      # 剪贴板读写（文本/图片/文件 CF_HDROP）
-│   │   ├── protocol.rs       # 与服务端一致的协议定义
-│   │   ├── sync.rs           # 同步引擎（WS + 轮询 + 命令通道）
-│   │   └── command.rs        # 同步命令枚举（SyncUpload 等）
+│   │   ├── main.rs           # 托盘 + 热键 + 消息泵 + 优雅关闭
+│   │   ├── config.rs         # TOML 配置 + 注册表自启
+│   │   ├── client.rs         # HTTP/WS 客户端（流式文件下载）
+│   │   ├── clipboard.rs      # 剪贴板（文本/图片/CF_HDROP）
+│   │   ├── protocol.rs       # 协议 DTO
+│   │   ├── sync.rs           # 同步引擎（WS + 轮询 + 退出信号）
+│   │   └── command.rs        # 命令枚举
 │   └── Cargo.toml
+│
+├── clipsync-android/         # Kotlin Android 客户端
+│   ├── app/src/main/java/com/clipsync/app/
+│   │   ├── MainActivity.kt       # Compose UI
+│   │   ├── SyncManager.kt        # 同步逻辑
+│   │   ├── WsClient.kt           # OkHttp WebSocket
+│   │   ├── HttpApi.kt            # HTTP 流式上传/下载
+│   │   ├── Protocol.kt           # Gson DTO + WS 解析
+│   │   ├── Config.kt             # SharedPreferences
+│   │   ├── ClipSyncApp.kt        # Application + Shizuku listener
+│   │   ├── SyncService.kt        # 前台 Service
+│   │   ├── ClipboardShell.kt     # Shizuku 剪贴板封装
+│   │   ├── ShizukuCompat.kt      # 反射调用 newProcess
+│   │   ├── ShizukuApiProvider.kt # ContentProvider 接收 binder
+│   │   └── moe/shizuku/api/
+│   │       └── BinderContainer.java  # Parcelable 桥接
+│   ├── app/src/main/res/
+│   │   ├── values/strings.xml
+│   │   ├── values/themes.xml
+│   │   └── xml/file_paths.xml
+│   ├── app/build.gradle.kts
+│   ├── build.gradle.kts
+│   └── settings.gradle.kts
 │
 ├── .gitignore
 ├── LICENSE
@@ -264,27 +293,31 @@ ClipSync/
 
 ---
 
+## 安全说明
+
+| 风险 | 建议 |
+|------|------|
+| 默认 token | 生产环境设置 `CLIPSYNC_TOKEN` 为随机字符串 |
+| 明文传输 | 配置 `CLIPSYNC_TLS_CERT_PATH` + `CLIPSYNC_TLS_KEY_PATH` 启用 TLS |
+| 请求体无限 | 服务端未限制请求体大小，建议用反向代理（nginx）限制 |
+| 速率限制 | 服务端无内置限流，建议前面加 nginx / cloudflare |
+| DB 无加密 | SQLite 文件无加密，确保存储目录仅对运行用户可读 |
+
+---
+
 ## 构建
 
 ```bash
 # 服务端
-cd clipsync-server
-cargo build --release
+cd clipsync-server && cargo build --release
 
-# Windows 客户端（需要 Windows 环境 + Rust MSVC toolchain）
-cd clipsync-windows
-cargo build --release
+# Windows 客户端（需要 Windows + MSVC toolchain）
+cd clipsync-windows && cargo build --release
+
+# Android（需要 Android SDK + JDK 17）
+cd clipsync-android
+./gradlew assembleDebug
 ```
-
----
-
-## 开发计划
-
-- [x] Windows 客户端（托盘图标、热键、文件同步）
-- [x] Linux 服务端（WebSocket + REST API）
-- [ ] Android 客户端（纯 Kotlin）
-- [ ] WebDAV 大文件传输支持
-- [ ] 加密传输（TLS）
 
 ---
 
