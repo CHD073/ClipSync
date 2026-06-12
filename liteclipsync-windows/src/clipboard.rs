@@ -125,6 +125,7 @@ pub(crate) fn read_clipboard() -> Option<ClipboardContent> {
     {
         let files = get_clipboard_files();
         if !files.is_empty() {
+            let mut any_failed = false;
             for path in &files {
                 if !path.exists() { continue; }
                 // 检查文件 mtime 缓存，避免重复读盘
@@ -157,6 +158,7 @@ pub(crate) fn read_clipboard() -> Option<ClipboardContent> {
                                 ClipboardContent::Image { png_bytes: png }
                             } else {
                                 warn!("  failed to decode {} as image", path.display());
+                                any_failed = true;
                                 continue;
                             };
                             if let Some(ts) = mtime {
@@ -164,7 +166,10 @@ pub(crate) fn read_clipboard() -> Option<ClipboardContent> {
                             }
                             return Some(content);
                         }
-                        Err(e) => warn!("  failed to read file {}: {e}", path.display()),
+                        Err(e) => {
+                            warn!("  failed to read file {}: {e}", path.display());
+                            any_failed = true;
+                        }
                     }
                 } else {
                     debug!("clipboard file: {} (generic)", path.display());
@@ -180,9 +185,16 @@ pub(crate) fn read_clipboard() -> Option<ClipboardContent> {
                             }
                             return Some(content);
                         }
-                        Err(e) => warn!("  failed to read file {}: {e}", path.display()),
+                        Err(e) => {
+                            warn!("  failed to read file {}: {e}", path.display());
+                            any_failed = true;
+                        }
                     }
                 }
+            }
+            // 剪贴板有文件但全部读失败，不降级到文本模式
+            if any_failed {
+                return None;
             }
         }
     }

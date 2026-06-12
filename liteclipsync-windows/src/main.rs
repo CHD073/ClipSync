@@ -9,6 +9,7 @@ mod sync;
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::path::PathBuf;
 use std::time::Duration;
 
 use clap::Parser;
@@ -29,25 +30,35 @@ struct Cli {
     server: Option<String>,
     #[arg(short, long, help = "Override auth token")]
     token: Option<String>,
+    #[arg(long, help = "Skip single-instance check on restart")]
+    restart: bool,
 }
 
 fn main() {
-    // ── 单实例保护 ──
-    unsafe {
-        use std::ffi::OsStr;
-        use std::os::windows::ffi::OsStrExt;
-        use windows_sys::Win32::System::Threading::CreateMutexW;
-        use windows_sys::Win32::Foundation::GetLastError;
-        const ERROR_ALREADY_EXISTS: u32 = 183;
-        let name = "Global\\LiteClipSync\0";
-        let wide: Vec<u16> = OsStr::new(name).encode_wide().collect();
-        let handle = CreateMutexW(std::ptr::null_mut(), 1, wide.as_ptr());
-        if handle.is_null() || GetLastError() == ERROR_ALREADY_EXISTS {
-            return;
+    let cli = Cli::parse();
+
+    // ── 单实例保护（重启时跳过） ──
+    if !cli.restart {
+        unsafe {
+            use std::ffi::OsStr;
+            use std::os::windows::ffi::OsStrExt;
+            use windows_sys::Win32::System::Threading::CreateMutexW;
+            use windows_sys::Win32::Foundation::GetLastError;
+            const ERROR_ALREADY_EXISTS: u32 = 183;
+            let name = "Global\\LiteClipSync\0";
+            let wide: Vec<u16> = OsStr::new(name).encode_wide().collect();
+            let handle = CreateMutexW(std::ptr::null_mut(), 1, wide.as_ptr());
+            if handle.is_null() || GetLastError() == ERROR_ALREADY_EXISTS {
+                return;
+            }
         }
     }
 
-    match std::fs::File::create("liteclipsync.log") {
+    let log_path = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|d| d.join("liteclipsync.log")))
+        .unwrap_or_else(|| PathBuf::from("liteclipsync.log"));
+    match std::fs::File::create(&log_path) {
         Ok(file) => {
             tracing_subscriber::fmt()
                 .with_ansi(false)
@@ -66,11 +77,10 @@ fn main() {
                         .unwrap_or_else(|_| EnvFilter::new("info")),
                 )
                 .init();
-            tracing::warn!("could not create log file: {e}, logging to stderr");
+            tracing::warn!("could not create log at {log_path:?}: {e}, logging to stderr");
         }
     }
 
-    let cli = Cli::parse();
     let mut cfg = config::Config::load().expect("failed to load config");
     if let Some(url) = cli.server {
         cfg.server_url = url;
@@ -345,19 +355,27 @@ fn handle_menu_event(
             }
         }
         "open-log" => {
+            let log = std::env::current_exe()
+                .ok()
+                .and_then(|p| p.parent().map(|d| d.join("liteclipsync.log")))
+                .unwrap_or_else(|| PathBuf::from("liteclipsync.log"));
             let _ = std::process::Command::new("notepad.exe")
-                .arg("liteclipsync.log")
+                .arg(&log)
                 .spawn();
         }
         "tray-restart" => {
             match std::env::current_exe() {
                 Ok(exe) => {
-                    let _ = std::process::Command::new(exe).spawn();
+                    if let Err(e) = std::process::Command::new(exe).arg("--restart").spawn() {
+                        tracing::error!("failed to spawn restart: {e}");
+                    }
                 }
                 Err(e) => {
                     tracing::error!("failed to get exe path for restart: {e}");
                 }
             }
+            shutdown.store(true, Ordering::SeqCst);
+            std::thread::sleep(Duration::from_millis(200));
             std::process::exit(0);
         }
         "quit" => {

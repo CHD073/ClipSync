@@ -200,8 +200,16 @@ async fn handle_command(
             uploading.store(true, Ordering::SeqCst);
             info!("hotkey: copy and sync");
             simulate_copy();
-            tokio::time::sleep(Duration::from_millis(200)).await;
-            if let Some(content) = read_clipboard_direct() {
+            // 多次重试读取剪贴板，给前台应用足够时间响应 Ctrl+C
+            let mut clip = None;
+            for _ in 0..5 {
+                tokio::time::sleep(Duration::from_millis(200)).await;
+                clip = read_clipboard_direct();
+                if clip.is_some() {
+                    break;
+                }
+            }
+            if let Some(content) = clip {
                 let hash = content.compute_hash();
                 monitor.set_last_hash(&hash);
                 handle_local_clipboard(content, config, session).await;
