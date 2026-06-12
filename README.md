@@ -222,6 +222,7 @@ sudo useradd -r -s /bin/false liteclipsync
 sudo mkdir -p /var/lib/liteclipsync
 sudo chown liteclipsync:liteclipsync /var/lib/liteclipsync
 sudo cp target/release/liteclipsync-server /opt/liteclipsync/
+sudo systemctl daemon-reload
 sudo systemctl enable --now liteclipsync
 ```
 
